@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>F1 What-If Race Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Formula 1 Strategy Lab</p>
+        <h1>What-If Race Simulator</h1>
+        <p class="subtitle">
+          Compare tire and track scenarios in real time to estimate lap performance.
+        </p>
+      </section>
+
+      <section class="control-panel" aria-label="Simulator controls">
+        <div class="field">
+          <label for="baseLap">Base Lap Time (seconds)</label>
+          <input id="baseLap" type="number" value="90" min="60" max="140" step="0.1" />
+        </div>
+
+        <div class="field">
+          <label for="tireCondition">Tire Condition</label>
+          <select id="tireCondition" class="dropdown">
+            <option value="new_soft">New Soft</option>
+            <option value="new_medium">New Medium</option>
+            <option value="new_hard">New Hard</option>
+            <option value="worn_soft">Worn Soft</option>
+            <option value="worn_medium">Worn Medium</option>
+            <option value="worn_hard">Worn Hard</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="wet">Full Wet</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="trackCondition">Track Condition</label>
+          <select id="trackCondition" class="dropdown">
+            <option value="optimal">Optimal Grip</option>
+            <option value="hot">Very Hot Asphalt</option>
+            <option value="cold">Cold Surface</option>
+            <option value="green">Green Track</option>
+            <option value="damp">Damp</option>
+            <option value="wet">Wet</option>
+          </select>
+        </div>
+
+        <button id="simulateBtn" class="simulate-btn" type="button">Run Simulation</button>
+      </section>
+
+      <section class="results" aria-live="polite">
+        <article class="result-card">
+          <h2>Predicted Lap Time</h2>
+          <p id="predictedTime" class="result-value">--</p>
+        </article>
+
+        <article class="result-card">
+          <h2>Time Delta</h2>
+          <p id="timeDelta" class="result-value">--</p>
+        </article>
+
+        <article class="result-card">
+          <h2>Strategy Note</h2>
+          <p id="strategyNote" class="strategy-note">Pick conditions and run simulation.</p>
+        </article>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
