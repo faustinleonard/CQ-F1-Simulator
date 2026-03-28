@@ -1,18 +1,21 @@
 :root {
-  --bg-red-900: #4e0202;
-  --bg-red-800: #6f0606;
-  --bg-red-700: #8d0909;
-  --bg-red-650: #960a0a;
-  --panel: #8a0404;
-  --input: #5f0000;
-  --input-border: #bd2d2d;
-  --line: rgba(255, 145, 145, 0.32);
+  --bg-red-900: #030303;
+  --bg-red-800: #070707;
+  --bg-red-700: #0d0d0d;
+  --bg-red-650: #101010;
+  --panel: #0b0b0b;
+  --input: #101010;
+  --input-border: #2f3a48;
+  --line: rgba(130, 180, 255, 0.24);
   --text: #f6f4f4;
-  --muted: rgba(255, 216, 216, 0.8);
+  --muted: rgba(200, 219, 246, 0.78);
   --btn-dark: #181b1f;
   --btn-dark-2: #2c2f35;
   --ok: #83d17a;
   --warn: #f6cd57;
+  --accent-cyan: #27d2ac;
+  --accent-blue: #74a8ff;
+  --accent-gold: #f3b300;
 }
 
 * {
@@ -25,8 +28,9 @@ body {
   font-family: "Barlow", sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at 18% 8%, rgba(240, 119, 119, 0.16), transparent 30%),
-    radial-gradient(circle at 75% 26%, rgba(255, 170, 140, 0.12), transparent 34%),
+    radial-gradient(circle at 16% 14%, rgba(39, 210, 172, 0.09), transparent 34%),
+    radial-gradient(circle at 82% 24%, rgba(116, 168, 255, 0.09), transparent 38%),
+    radial-gradient(circle at 52% 86%, rgba(243, 179, 0, 0.08), transparent 30%),
     linear-gradient(165deg, var(--bg-red-900), var(--bg-red-700) 48%, var(--bg-red-800));
 }
 
@@ -36,13 +40,13 @@ body {
 }
 
 .race-card {
-  border: 2px solid rgba(236, 74, 74, 0.5);
+  border: 2px solid rgba(116, 168, 255, 0.38);
   background:
-    linear-gradient(180deg, rgba(162, 12, 12, 0.96), rgba(145, 7, 7, 0.97));
+    linear-gradient(180deg, rgba(12, 16, 20, 0.98), rgba(5, 8, 10, 0.98));
   border-radius: 16px;
   box-shadow:
-    0 18px 45px rgba(52, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 180, 180, 0.22);
+    0 18px 45px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(116, 168, 255, 0.2);
   overflow: hidden;
   animation: panel-rise 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
@@ -64,7 +68,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 135, 135, 0.3);
+  border-bottom: 1px solid rgba(116, 168, 255, 0.26);
 }
 
 .race-card-header h1 {
@@ -73,12 +77,12 @@ body {
   letter-spacing: 0.22em;
   font-size: clamp(1rem, 1.3vw, 1.3rem);
   font-family: "Space Grotesk", sans-serif;
-  color: rgba(255, 232, 232, 0.9);
+  color: rgba(224, 236, 255, 0.92);
 }
 
 .setup-btn {
   border: 1px solid rgba(255, 171, 112, 0.7);
-  background: rgba(108, 27, 14, 0.7);
+  background: rgba(20, 20, 20, 0.9);
   color: #ffbc71;
   border-radius: 8px;
   padding: 0.42rem 0.9rem;
@@ -86,6 +90,12 @@ body {
   text-transform: capitalize;
   font-weight: 700;
   cursor: default;
+}
+
+.setup-btn:hover {
+  background: rgba(142, 10, 10, 0.9);
+  border-color: rgba(255, 84, 84, 0.9);
+  color: #ffe1e1;
 }
 
 .config-grid,
@@ -120,7 +130,7 @@ label {
   font-family: "Space Grotesk", sans-serif;
   font-size: 0.8rem;
   font-weight: 700;
-  color: rgba(255, 209, 209, 0.88);
+  color: rgba(196, 221, 255, 0.88);
 }
 
 input,
@@ -133,7 +143,7 @@ input,
   background: var(--input);
   color: var(--text);
   padding: 0.8rem 1rem;
-  box-shadow: inset 0 1px 0 rgba(255, 150, 150, 0.15);
+  box-shadow: inset 0 1px 0 rgba(120, 180, 255, 0.16);
 }
 
 input:focus,
@@ -153,7 +163,7 @@ input:focus,
 
 .tyre-btn {
   border: 2px solid var(--line);
-  background: rgba(93, 0, 0, 0.9);
+  background: rgba(12, 12, 12, 0.94);
   color: var(--muted);
   border-radius: 11px;
   min-height: 56px;
@@ -168,11 +178,14 @@ input:focus,
 }
 
 .tyre-btn:hover {
+  background: rgba(151, 9, 9, 0.88);
+  border-color: rgba(255, 84, 84, 0.9);
+  color: #fff2f2;
   transform: translateY(-1px);
 }
 
 .tyre-btn.active {
-  background: rgba(163, 64, 85, 0.36);
+  background: rgba(41, 66, 95, 0.5);
   border-color: rgba(143, 184, 255, 0.95);
   color: #dce7ff;
 }
@@ -202,14 +215,21 @@ input:focus,
   text-transform: uppercase;
   font-weight: 800;
   color: #ececec;
-  background: linear-gradient(180deg, var(--btn-dark), var(--btn-dark-2));
+  background: linear-gradient(180deg, #121212, #070707);
   cursor: pointer;
   transition: filter 160ms ease, transform 160ms ease;
 }
 
 .simulate-btn:hover {
-  filter: brightness(1.06);
+  background: linear-gradient(180deg, rgba(155, 10, 10, 0.95), rgba(110, 4, 4, 0.95));
+  border-color: rgba(255, 92, 92, 0.95);
+  filter: brightness(1.04);
   transform: translateY(-1px);
+}
+
+.dropdown:hover {
+  background: rgba(130, 8, 8, 0.82);
+  border-color: rgba(255, 90, 90, 0.9);
 }
 
 .results {
@@ -221,8 +241,8 @@ input:focus,
 }
 
 .result-card {
-  border: 2px solid rgba(255, 166, 77, 0.6);
-  background: rgba(94, 6, 6, 0.55);
+  border: 2px solid rgba(243, 179, 0, 0.46);
+  background: linear-gradient(180deg, rgba(10, 14, 17, 0.94), rgba(7, 10, 12, 0.94));
   border-radius: 10px;
   padding: 0.85rem;
 }
@@ -233,7 +253,7 @@ input:focus,
   letter-spacing: 0.12em;
   font-family: "Space Grotesk", sans-serif;
   font-size: 0.8rem;
-  color: rgba(255, 208, 208, 0.95);
+  color: rgba(222, 236, 255, 0.95);
 }
 
 .result-value {
@@ -252,7 +272,7 @@ input:focus,
 
 .result-subtitle {
   margin: 0.45rem 0 0;
-  color: rgba(255, 223, 223, 0.85);
+  color: rgba(189, 212, 240, 0.86);
   font-size: 0.78rem;
   letter-spacing: 0.06em;
   text-transform: none;
@@ -264,9 +284,9 @@ input:focus,
 
 .analysis-panel {
   margin: 0.8rem 1.5rem 1.2rem;
-  border: 1px solid rgba(255, 138, 138, 0.35);
+  border: 1px solid rgba(116, 168, 255, 0.3);
   border-radius: 12px;
-  background: rgba(117, 10, 10, 0.45);
+  background: linear-gradient(180deg, rgba(9, 13, 16, 0.96), rgba(6, 9, 12, 0.96));
   padding: 1rem;
 }
 
@@ -286,7 +306,7 @@ input:focus,
   text-transform: uppercase;
   letter-spacing: 0.2em;
   font-size: 1rem;
-  color: rgba(255, 214, 214, 0.92);
+  color: rgba(206, 229, 255, 0.92);
   font-family: "Space Grotesk", sans-serif;
 }
 
@@ -297,17 +317,17 @@ input:focus,
 }
 
 .compound-pill {
-  border: 1px solid rgba(243, 154, 68, 0.45);
+  border: 1px solid rgba(116, 168, 255, 0.42);
   border-radius: 7px;
   padding: 0.25rem 0.58rem;
   font-family: "Space Grotesk", sans-serif;
   font-size: 0.83rem;
-  color: rgba(255, 227, 227, 0.85);
-  background: rgba(104, 26, 26, 0.72);
+  color: rgba(214, 232, 255, 0.88);
+  background: rgba(14, 18, 23, 0.94);
 }
 
 .compound-pill.active {
-  box-shadow: inset 0 0 0 1px rgba(255, 198, 121, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(116, 168, 255, 0.6);
 }
 
 .compound-pill.soft.active {
@@ -337,9 +357,9 @@ input:focus,
 
 .degradation-chart-wrap {
   margin-top: 0.8rem;
-  border: 1px solid rgba(255, 137, 137, 0.25);
+  border: 1px solid rgba(116, 168, 255, 0.3);
   border-radius: 8px;
-  background: rgba(134, 7, 7, 0.46);
+  background: linear-gradient(180deg, rgba(9, 14, 18, 0.94), rgba(8, 11, 14, 0.94));
   padding: 0.5rem;
 }
 
@@ -364,7 +384,7 @@ input:focus,
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 223, 223, 0.86);
+  color: rgba(203, 225, 249, 0.9);
 }
 
 .line-key {
@@ -403,7 +423,7 @@ input:focus,
 .timeline-divider {
   margin: 1rem 0;
   height: 1px;
-  background: rgba(255, 144, 144, 0.35);
+  background: linear-gradient(90deg, rgba(39, 210, 172, 0.25), rgba(116, 168, 255, 0.35), rgba(243, 179, 0, 0.25));
 }
 
 .timeline-head {
@@ -411,10 +431,10 @@ input:focus,
 }
 
 .strategy-badge {
-  border: 1px solid rgba(243, 154, 68, 0.75);
+  border: 1px solid rgba(243, 179, 0, 0.72);
   border-radius: 8px;
-  color: #f1c746;
-  background: rgba(117, 51, 8, 0.4);
+  color: #f3d37c;
+  background: rgba(18, 25, 31, 0.9);
   padding: 0.24rem 0.68rem;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -422,11 +442,11 @@ input:focus,
 
 .pit-timeline-track {
   display: flex;
-  border: 1px solid rgba(255, 140, 140, 0.4);
+  border: 1px solid rgba(116, 168, 255, 0.34);
   border-radius: 8px;
   overflow: hidden;
   min-height: 44px;
-  background: rgba(82, 9, 9, 0.7);
+  background: rgba(12, 12, 12, 0.94);
 }
 
 .timeline-segment {
@@ -436,8 +456,8 @@ input:focus,
   font-family: "Space Grotesk", sans-serif;
   font-weight: 700;
   letter-spacing: 0.04em;
-  border-right: 1px solid rgba(255, 175, 175, 0.35);
-  color: rgba(239, 227, 227, 0.9);
+  border-right: 1px solid rgba(196, 218, 249, 0.26);
+  color: rgba(229, 237, 248, 0.92);
 }
 
 .timeline-segment:last-child {
@@ -454,7 +474,7 @@ input:focus,
 }
 
 .timeline-segment.hard {
-  background: rgba(84, 40, 40, 0.75);
+  background: rgba(70, 74, 82, 0.72);
 }
 
 .timeline-segment.inter {
@@ -469,7 +489,7 @@ input:focus,
   margin-top: 0.4rem;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  color: rgba(255, 212, 212, 0.8);
+  color: rgba(188, 214, 245, 0.86);
   font-family: "Space Grotesk", sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0.09em;
@@ -499,9 +519,9 @@ input:focus,
 }
 
 .ai-analysis-card {
-  border: 2px solid rgba(244, 154, 63, 0.48);
+  border: 2px solid rgba(39, 210, 172, 0.45);
   border-radius: 11px;
-  background: rgba(95, 6, 6, 0.66);
+  background: rgba(12, 12, 12, 0.94);
   padding: 0.95rem;
 }
 
@@ -511,27 +531,27 @@ input:focus,
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.92rem;
-  color: #f4c43d;
+  color: #7bd8ff;
 }
 
 .ai-analysis-card p {
   margin: 0.78rem 0 0;
   font-size: 1.05rem;
   line-height: 1.45;
-  color: rgba(246, 235, 235, 0.95);
+  color: rgba(224, 236, 250, 0.95);
 }
 
 .comparison-card {
-  border: 2px solid rgba(244, 154, 63, 0.55);
+  border: 2px solid rgba(116, 168, 255, 0.4);
   border-radius: 11px;
-  background: rgba(96, 10, 10, 0.6);
+  background: rgba(12, 12, 12, 0.94);
   padding: 0.78rem;
   min-height: 228px;
 }
 
 .comparison-card.fastest {
-  border-color: rgba(251, 178, 61, 0.95);
-  box-shadow: inset 0 0 0 1px rgba(251, 178, 61, 0.55);
+  border-color: rgba(243, 179, 0, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(243, 179, 0, 0.52);
 }
 
 .comparison-headline {
@@ -542,7 +562,7 @@ input:focus,
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 800;
-  color: rgba(245, 227, 227, 0.92);
+  color: rgba(217, 233, 252, 0.93);
 }
 
 .comparison-dot {
@@ -560,12 +580,12 @@ input:focus,
 
 .fastest-tag {
   margin-left: 0.22rem;
-  border: 1px solid rgba(251, 178, 61, 0.62);
+  border: 1px solid rgba(243, 179, 0, 0.62);
   border-radius: 6px;
   padding: 0.14rem 0.4rem;
   font-size: 0.67rem;
   color: #f4c43d;
-  background: rgba(139, 81, 10, 0.36);
+  background: rgba(94, 77, 18, 0.42);
 }
 
 .comparison-metric {
