@@ -940,7 +940,7 @@ function updateUI(
 function resetSimulationUI() {
   clearResultRevealTimers();
 
-  baseLapInput.value = "90";
+  baseLapInput.value = "";
 
   if (targetDriverSelect.options.length) {
     targetDriverSelect.selectedIndex = 0;
