@@ -362,6 +362,24 @@ input:focus,
   font-weight: 800;
 }
 
+.result-value.result-reveal {
+  animation: kpi-number-reveal 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes kpi-number-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(2px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
 .result-value.positive {
   color: var(--warn);
 }
@@ -803,6 +821,10 @@ input:focus,
   .tyre-btn.active,
   .dot,
   .simulate-btn::after {
+    animation: none;
+  }
+
+  .result-value.result-reveal {
     animation: none;
   }
 

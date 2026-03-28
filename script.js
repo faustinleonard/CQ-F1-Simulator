@@ -32,6 +32,7 @@ let scrollRevealObserver = null;
 let revealRequiresPostSimulationScroll = false;
 let hasScrolledAfterSimulation = false;
 let simulationRevealStartScrollY = 0;
+let resultRevealTimeouts = [];
 
 // State
 const simulationData = {
@@ -606,6 +607,38 @@ function renderCopilotAnalysis(text) {
   copilotAnalysisTextEl.textContent = text || "Run simulation to generate a strategy briefing.";
 }
 
+function clearResultRevealTimers() {
+  resultRevealTimeouts.forEach((timerId) => {
+    clearTimeout(timerId);
+  });
+  resultRevealTimeouts = [];
+}
+
+function animateResultValuesSequentially() {
+  const resultValues = [predictedTimeEl, deltaEl, pitWindowEl, raceTotalEl];
+  clearResultRevealTimers();
+
+  resultValues.forEach((valueEl) => {
+    if (!valueEl) {
+      return;
+    }
+    valueEl.classList.remove("result-reveal");
+    void valueEl.offsetWidth;
+  });
+
+  const initialDelayMs = 140;
+  const staggerMs = 300;
+  resultValues.forEach((valueEl, index) => {
+    if (!valueEl) {
+      return;
+    }
+    const timerId = setTimeout(() => {
+      valueEl.classList.add("result-reveal");
+    }, initialDelayMs + (index * staggerMs));
+    resultRevealTimeouts.push(timerId);
+  });
+}
+
 function setActiveTyre(value) {
   simulationData.selectedTyre = value;
   tyreButtons.forEach((button) => {
@@ -899,6 +932,7 @@ function updateUI(
   renderPitTimeline(pitStrategyTimeline, raceLaps, strategyLabel);
   renderCompoundComparison(compoundComparison, fastestCompound);
   renderCopilotAnalysis(copilotAnalysis);
+  animateResultValuesSequentially();
   showPostSimulationPanel();
 }
 
