@@ -88,6 +88,14 @@ class RaceSimulator:
             return ""
         normalized = str(circuit).strip().lower().replace("_", "-").replace(" ", "-")
         return normalized
+
+    def calculate_driver_delta(self, driver_position):
+        """Estimate pace delta from championship position."""
+        if driver_position is None:
+            return 0.0
+        baseline_position = 10
+        step_per_position = 0.06
+        return (float(driver_position) - baseline_position) * step_per_position
     
     def _load_strategies(self):
         """Load predefined pit stop strategies."""
@@ -321,6 +329,7 @@ class RaceSimulator:
         total_delta,
         pit_window_lap,
         fastest_compound,
+        driver_name=None,
     ):
         """Generate a short Copilot strategy narrative for the selected scenario."""
         tyre_label = {
@@ -354,8 +363,9 @@ class RaceSimulator:
             pace_phrase = "expect near-baseline race pace"
 
         fastest_label = str(fastest_compound or "medium").capitalize()
+        prefix = f"{driver_name}: " if driver_name else ""
         return (
-            f"On {tyre_label} compound with {track_label}, {pace_phrase}. "
+            f"{prefix}On {tyre_label} compound with {track_label}, {pace_phrase}. "
             f"With {risk_label}, target pit around lap {pit_window_lap} for undercut coverage. "
             f"If degradation rises, {fastest_label} currently projects as the fastest average alternative."
         )
@@ -455,12 +465,24 @@ def generate_mock_f1_data():
     drivers = [
         {"id": 1, "name": "Max Verstappen", "number": 1, "team": "Red Bull Racing", "position": 1},
         {"id": 2, "name": "Lando Norris", "number": 4, "team": "McLaren", "position": 2},
-        {"id": 3, "name": "Lewis Hamilton", "number": 44, "team": "Mercedes", "position": 3},
-        {"id": 4, "name": "Carlos Sainz", "number": 55, "team": "Ferrari", "position": 4},
-        {"id": 5, "name": "Charles Leclerc", "number": 16, "team": "Ferrari", "position": 5},
-        {"id": 6, "name": "Oscar Piastri", "number": 81, "team": "McLaren", "position": 6},
-        {"id": 7, "name": "George Russell", "number": 63, "team": "Mercedes", "position": 7},
+        {"id": 3, "name": "Charles Leclerc", "number": 16, "team": "Ferrari", "position": 3},
+        {"id": 4, "name": "Oscar Piastri", "number": 81, "team": "McLaren", "position": 4},
+        {"id": 5, "name": "Carlos Sainz", "number": 55, "team": "Williams", "position": 5},
+        {"id": 6, "name": "George Russell", "number": 63, "team": "Mercedes", "position": 6},
+        {"id": 7, "name": "Lewis Hamilton", "number": 44, "team": "Ferrari", "position": 7},
         {"id": 8, "name": "Fernando Alonso", "number": 14, "team": "Aston Martin", "position": 8},
+        {"id": 9, "name": "Alex Albon", "number": 23, "team": "Williams", "position": 9},
+        {"id": 10, "name": "Lance Stroll", "number": 18, "team": "Aston Martin", "position": 10},
+        {"id": 11, "name": "Pierre Gasly", "number": 10, "team": "Alpine", "position": 11},
+        {"id": 12, "name": "Esteban Ocon", "number": 31, "team": "Haas", "position": 12},
+        {"id": 13, "name": "Yuki Tsunoda", "number": 22, "team": "RB", "position": 13},
+        {"id": 14, "name": "Daniel Ricciardo", "number": 3, "team": "RB", "position": 14},
+        {"id": 15, "name": "Nico Hulkenberg", "number": 27, "team": "Sauber", "position": 15},
+        {"id": 16, "name": "Valtteri Bottas", "number": 77, "team": "Sauber", "position": 16},
+        {"id": 17, "name": "Kevin Magnussen", "number": 20, "team": "Haas", "position": 17},
+        {"id": 18, "name": "Logan Sargeant", "number": 2, "team": "Williams", "position": 18},
+        {"id": 19, "name": "Guanyu Zhou", "number": 24, "team": "Sauber", "position": 19},
+        {"id": 20, "name": "Oliver Bearman", "number": 87, "team": "Haas", "position": 20},
     ]
     
     return {
@@ -643,6 +665,14 @@ def simulate_lap():
     tyre_compound = data.get("tyre_compound")
     tire_condition = simulator.normalize_tire(data.get("tire_condition"), tyre_compound)
 
+    driver_id = data.get("driver_id")
+    selected_driver = None
+    driver_delta = 0.0
+    if driver_id is not None:
+        selected_driver = next((d for d in f1_data["drivers"] if d["id"] == int(driver_id)), None)
+        if selected_driver:
+            driver_delta = simulator.calculate_driver_delta(selected_driver.get("position"))
+
     round_num = data.get("round")
     selected_race = None
     if round_num is not None:
@@ -665,6 +695,9 @@ def simulate_lap():
         safety_car_risk,
         circuit,
     )
+
+    result["total_delta"] = round(result["total_delta"] + driver_delta, 3)
+    result["predicted_lap"] = round(result["predicted_lap"] + driver_delta, 2)
 
     race_laps = 50
     if selected_race and "laps" in selected_race:
@@ -695,6 +728,9 @@ def simulate_lap():
     result["tyre_compound"] = tyre_compound
     result["tire_condition"] = tire_condition
     result["round"] = round_num
+    result["driver_id"] = driver_id
+    result["driver_delta"] = round(driver_delta, 3)
+    result["selected_driver"] = selected_driver
     result["race_laps"] = race_laps
     result["pit_window_lap"] = pit_window_lap
     result["pit_window_reason"] = "Undercut window"
@@ -712,6 +748,7 @@ def simulate_lap():
         result["total_delta"],
         pit_window_lap,
         compound_comparison["fastest_compound"],
+        selected_driver["name"] if selected_driver else None,
     )
     
     return jsonify(result)

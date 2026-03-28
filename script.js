@@ -38,10 +38,24 @@ const simulationData = {
 const fallbackDrivers = [
   { id: 1, name: "Max Verstappen", number: 1, team: "Red Bull", position: 1 },
   { id: 2, name: "Lando Norris", number: 4, team: "McLaren", position: 2 },
-  { id: 3, name: "Lewis Hamilton", number: 44, team: "Mercedes", position: 3 },
-  { id: 4, name: "Charles Leclerc", number: 16, team: "Ferrari", position: 4 },
-  { id: 5, name: "George Russell", number: 63, team: "Mercedes", position: 5 },
-  { id: 6, name: "Oscar Piastri", number: 81, team: "McLaren", position: 6 },
+  { id: 3, name: "Charles Leclerc", number: 16, team: "Ferrari", position: 3 },
+  { id: 4, name: "Oscar Piastri", number: 81, team: "McLaren", position: 4 },
+  { id: 5, name: "Carlos Sainz", number: 55, team: "Williams", position: 5 },
+  { id: 6, name: "George Russell", number: 63, team: "Mercedes", position: 6 },
+  { id: 7, name: "Lewis Hamilton", number: 44, team: "Ferrari", position: 7 },
+  { id: 8, name: "Fernando Alonso", number: 14, team: "Aston Martin", position: 8 },
+  { id: 9, name: "Alex Albon", number: 23, team: "Williams", position: 9 },
+  { id: 10, name: "Lance Stroll", number: 18, team: "Aston Martin", position: 10 },
+  { id: 11, name: "Pierre Gasly", number: 10, team: "Alpine", position: 11 },
+  { id: 12, name: "Esteban Ocon", number: 31, team: "Haas", position: 12 },
+  { id: 13, name: "Yuki Tsunoda", number: 22, team: "RB", position: 13 },
+  { id: 14, name: "Daniel Ricciardo", number: 3, team: "RB", position: 14 },
+  { id: 15, name: "Nico Hulkenberg", number: 27, team: "Sauber", position: 15 },
+  { id: 16, name: "Valtteri Bottas", number: 77, team: "Sauber", position: 16 },
+  { id: 17, name: "Kevin Magnussen", number: 20, team: "Haas", position: 17 },
+  { id: 18, name: "Logan Sargeant", number: 2, team: "Williams", position: 18 },
+  { id: 19, name: "Guanyu Zhou", number: 24, team: "Sauber", position: 19 },
+  { id: 20, name: "Oliver Bearman", number: 87, team: "Haas", position: 20 },
 ];
 
 const fallbackRaces = [
@@ -309,8 +323,10 @@ function getCopilotAnalysis(tyre, track, safetyRisk, totalDelta, pitWindowLap, f
     high: "high safety-car risk",
   }[safetyRisk] || "low safety-car risk";
 
+  const selectedDriver = getSelectedDriver();
+  const prefix = selectedDriver?.name ? `${selectedDriver.name}: ` : "";
   const fastestLabel = getTyreLabel(fastestCompound || "medium");
-  return `On ${getTyreLabel(tyre).toLowerCase()} compound with ${trackLabel}, ${pacePhrase}. With ${riskLabel}, target pit around lap ${pitWindowLap} for undercut coverage. If degradation rises, ${fastestLabel} currently projects as the fastest average alternative.`;
+  return `${prefix}On ${getTyreLabel(tyre).toLowerCase()} compound with ${trackLabel}, ${pacePhrase}. With ${riskLabel}, target pit around lap ${pitWindowLap} for undercut coverage. If degradation rises, ${fastestLabel} currently projects as the fastest average alternative.`;
 }
 
 function toCompoundKey(label) {
@@ -586,8 +602,8 @@ function getDriverDelta(driver) {
   if (!driver || !Number.isFinite(driver.position)) {
     return 0;
   }
-  const baselinePosition = 5;
-  const stepPerPosition = 0.12;
+  const baselinePosition = 10;
+  const stepPerPosition = 0.06;
   return (driver.position - baselinePosition) * stepPerPosition;
 }
 
@@ -717,15 +733,16 @@ async function runSimulation() {
     }
 
     const data = await response.json();
+    const backendSelectedDriver = data.selected_driver || selectedDriver;
     updateUI(
-      data.predicted_lap + driverDelta,
-      data.total_delta + driverDelta,
+      data.predicted_lap,
+      data.total_delta,
       data.pit_window_lap,
       data.race_total_seconds,
       data.race_laps,
       data.pit_window_reason,
       selectedTyre,
-      selectedDriver,
+      backendSelectedDriver,
       {
         degradationCurves: data.degradation_curves,
         pitStrategyTimeline: data.pit_strategy_timeline,
@@ -781,7 +798,7 @@ function updateUI(
   analysisData,
 ) {
   predictedTimeEl.textContent = formatLapTime(predictedLap);
-  predictedMetaEl.textContent = `${getTyreLabel(tyre)} (${selectedDriver?.number ?? "--"}) at peak`;
+  predictedMetaEl.textContent = `${selectedDriver?.name ?? "Driver"} - ${getTyreLabel(tyre)} at peak`;
 
   deltaEl.textContent = `${totalDelta > 0 ? "+" : ""}${totalDelta.toFixed(3)}s`;
   deltaEl.classList.remove("positive", "negative");
