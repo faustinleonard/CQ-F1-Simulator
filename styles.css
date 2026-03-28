@@ -75,6 +75,15 @@ body {
   gap: 0.35rem;
 }
 
+.field.full-row {
+  grid-column: 1 / -1;
+}
+
+#targetDriver {
+  width: calc(100% - 100px);
+  justify-self: start;
+}
+
 label {
   font-weight: 700;
   font-size: 0.95rem;
