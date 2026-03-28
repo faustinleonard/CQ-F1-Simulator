@@ -69,6 +69,62 @@ body {
   animation: speed-sweep 16s linear infinite;
 }
 
+.race-card::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 13px;
+  padding: 2px;
+  pointer-events: none;
+  background:
+    repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0.82) 0deg 6deg,
+      rgba(218, 22, 22, 0.82) 6deg 12deg,
+      rgba(255, 255, 255, 0.82) 12deg 18deg,
+      rgba(198, 16, 16, 0.82) 18deg 24deg
+    ),
+    conic-gradient(
+      from 14deg,
+      rgba(255, 42, 42, 0.88),
+      rgba(243, 179, 0, 0.88),
+      rgba(39, 210, 172, 0.88),
+      rgba(116, 168, 255, 0.88),
+      rgba(255, 42, 42, 0.88)
+    );
+  background-size: 100% 100%, 100% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 18px rgba(255, 49, 49, 0.2),
+    0 0 26px rgba(116, 168, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  opacity: 0.9;
+  z-index: 2;
+  animation: track-ring-pulse 4.8s ease-in-out infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+@keyframes track-ring-pulse {
+  0% {
+    filter: brightness(0.94) saturate(0.95);
+  }
+
+  50% {
+    filter: brightness(1.06) saturate(1.12);
+  }
+
+  100% {
+    filter: brightness(0.94) saturate(0.95);
+  }
+}
+
 @keyframes speed-sweep {
   from {
     transform: translateX(-42%);
@@ -839,6 +895,7 @@ input:focus,
 
 @media (prefers-reduced-motion: reduce) {
   .race-card::before,
+  .race-card::after,
   .tyre-btn.active,
   .dot,
   .simulate-btn::after {
