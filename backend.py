@@ -162,6 +162,102 @@ class RaceSimulator:
 
         ratio = max(0.25, min(0.72, base_ratio + risk_adjust + track_adjust))
         return max(1, int(round(race_laps * ratio)))
+
+    def build_degradation_curves(self, base_predicted_lap, race_laps):
+        """Build lap-by-lap degradation curves for soft/medium/hard compounds."""
+        race_laps = max(1, int(race_laps))
+        rates = {
+            "soft": 0.28,
+            "medium": 0.18,
+            "hard": 0.10,
+            "inter": 0.24,
+            "wet": 0.34,
+        }
+        initial_offset = {
+            "soft": -0.25,
+            "medium": 0.0,
+            "hard": 0.15,
+            "inter": 0.6,
+            "wet": 1.1,
+        }
+
+        curves = {}
+        for compound, rate in rates.items():
+            points = []
+            for lap in range(1, race_laps + 1):
+                lap_time = base_predicted_lap + initial_offset[compound] + (lap - 1) * rate
+                points.append({"lap": lap, "time": round(lap_time, 3)})
+            curves[compound] = points
+        return curves
+
+    def build_pit_timeline(self, tyre_compound, race_laps, pit_window_lap, safety_car_risk):
+        """Build a pit strategy timeline describing stints and compounds."""
+        race_laps = max(1, int(race_laps))
+        compound = str(tyre_compound or "medium").lower()
+        safety_key = self.normalize_safety_risk(safety_car_risk)
+
+        planned_stops = {
+            "soft": 3,
+            "medium": 2,
+            "hard": 2,
+            "inter": 3,
+            "wet": 3,
+        }.get(compound, 2)
+
+        if safety_key == "high":
+            planned_stops = min(3, planned_stops + 1)
+
+        stop_fractions = {
+            1: [0.56],
+            2: [0.50, 0.78],
+            3: [0.38, 0.66, 0.84],
+        }
+        fractions = stop_fractions.get(planned_stops, stop_fractions[2])
+
+        safety_shift = {
+            "low": 0.0,
+            "medium": -0.02,
+            "high": -0.05,
+        }[safety_key]
+
+        pit_laps = []
+        for idx, fraction in enumerate(fractions):
+            base_lap = int(round(race_laps * (fraction + safety_shift)))
+            if idx == 0:
+                base_lap = max(base_lap, int(pit_window_lap))
+            floor_lap = pit_laps[-1] + 4 if pit_laps else 4
+            cap_lap = race_laps - (planned_stops - idx)
+            pit_laps.append(max(floor_lap, min(cap_lap, base_lap)))
+
+        stint_order = {
+            "soft": ["Soft", "Medium", "Hard", "Hard"],
+            "medium": ["Medium", "Hard", "Hard"],
+            "hard": ["Hard", "Medium", "Hard"],
+            "inter": ["Inter", "Medium", "Hard", "Hard"],
+            "wet": ["Wet", "Inter", "Medium", "Hard"],
+        }.get(compound, ["Medium", "Hard", "Hard"])
+
+        timeline = []
+        start_lap = 1
+        for idx, pit_lap in enumerate(pit_laps):
+            timeline.append({
+                "compound": stint_order[min(idx, len(stint_order) - 1)],
+                "start_lap": start_lap,
+                "end_lap": pit_lap,
+            })
+            start_lap = pit_lap + 1
+
+        timeline.append({
+            "compound": stint_order[min(len(pit_laps), len(stint_order) - 1)],
+            "start_lap": start_lap,
+            "end_lap": race_laps,
+        })
+
+        return {
+            "timeline": timeline,
+            "pit_stop_count": len(pit_laps),
+            "strategy_label": f"{len(pit_laps)}-STOP",
+        }
     
     def predict_race_finish(self, starting_position, strategy, num_laps, 
                            base_lap, tire, track, reliability=1.0):
@@ -481,6 +577,13 @@ def simulate_lap():
     )
 
     race_total_seconds = round(result["predicted_lap"] * race_laps, 2)
+    degradation_curves = simulator.build_degradation_curves(result["predicted_lap"], race_laps)
+    pit_strategy = simulator.build_pit_timeline(
+        tyre_compound,
+        race_laps,
+        pit_window_lap,
+        safety_car_risk,
+    )
 
     result["tyre_compound"] = tyre_compound
     result["tire_condition"] = tire_condition
@@ -489,6 +592,10 @@ def simulate_lap():
     result["pit_window_lap"] = pit_window_lap
     result["pit_window_reason"] = "Undercut window"
     result["race_total_seconds"] = race_total_seconds
+    result["degradation_curves"] = degradation_curves
+    result["pit_strategy_timeline"] = pit_strategy["timeline"]
+    result["pit_stop_count"] = pit_strategy["pit_stop_count"]
+    result["strategy_label"] = pit_strategy["strategy_label"]
     
     return jsonify(result)
 

@@ -41,6 +41,7 @@
           <div class="field">
             <label for="trackCondition">Track Condition</label>
             <select id="trackCondition" class="dropdown">
+              <option value="" selected disabled>Select track condition</option>
               <option value="optimal">Optimal Grip</option>
               <option value="hot">Very Hot Asphalt</option>
               <option value="cold">Cold Surface</option>
@@ -53,6 +54,7 @@
           <div class="field">
             <label for="safetyCarRisk">Safety Car Risk</label>
             <select id="safetyCarRisk" class="dropdown">
+              <option value="" selected disabled>Select safety car risk</option>
               <option value="low">Low (10%)</option>
               <option value="medium">Medium (35%)</option>
               <option value="high">High (60%)</option>
@@ -109,6 +111,44 @@
             <p id="raceTotal" class="result-value">--</p>
             <p id="raceMeta" class="result-subtitle">-- laps</p>
           </article>
+        </section>
+
+        <section id="postSimPanel" class="analysis-panel hidden" aria-live="polite">
+          <div class="analysis-header">
+            <h2>Lap Time Degradation</h2>
+            <div id="compoundLegend" class="compound-legend">
+              <span class="compound-pill soft">Soft (S)</span>
+              <span class="compound-pill medium">Medium (M)</span>
+              <span class="compound-pill hard">Hard (H)</span>
+              <span class="compound-pill inter">Inter (I)</span>
+              <span class="compound-pill wet">Wet (W)</span>
+            </div>
+          </div>
+
+          <div class="degradation-chart-wrap">
+            <svg
+              id="degradationChart"
+              class="degradation-chart"
+              viewBox="0 0 1180 320"
+              preserveAspectRatio="xMidYMid meet"
+              role="img"
+              aria-label="Lap time degradation chart"
+            ></svg>
+          </div>
+
+          <div class="timeline-divider"></div>
+
+          <div class="analysis-header timeline-head">
+            <h2>Pit Strategy Timeline</h2>
+            <span id="strategyBadge" class="strategy-badge">--</span>
+          </div>
+
+          <div id="pitTimelineTrack" class="pit-timeline-track"></div>
+          <div class="pit-scale">
+            <span id="timelineStart">Lap 1</span>
+            <span id="timelineMid">Lap --</span>
+            <span id="timelineEnd">Lap --</span>
+          </div>
         </section>
       </section>
     </main>

@@ -17,6 +17,14 @@ const pitWindowEl = document.getElementById("pitWindow");
 const pitMetaEl = document.getElementById("pitMeta");
 const raceTotalEl = document.getElementById("raceTotal");
 const raceMetaEl = document.getElementById("raceMeta");
+const postSimPanelEl = document.getElementById("postSimPanel");
+const degradationChartEl = document.getElementById("degradationChart");
+const pitTimelineTrackEl = document.getElementById("pitTimelineTrack");
+const strategyBadgeEl = document.getElementById("strategyBadge");
+const timelineStartEl = document.getElementById("timelineStart");
+const timelineMidEl = document.getElementById("timelineMid");
+const timelineEndEl = document.getElementById("timelineEnd");
+const compoundLegendEl = document.getElementById("compoundLegend");
 
 // State
 const simulationData = {
@@ -146,6 +154,227 @@ function computePitWindowLap(tyre, race, safetyRisk, track) {
   return Math.round(totalLaps * ratio);
 }
 
+function getDegradationCurves(predictedLap, raceLaps) {
+  const laps = Number(raceLaps) || 50;
+  const seriesSpec = {
+    soft: { rate: 0.28, offset: -0.25 },
+    medium: { rate: 0.18, offset: 0.0 },
+    hard: { rate: 0.1, offset: 0.15 },
+    inter: { rate: 0.24, offset: 0.6 },
+    wet: { rate: 0.34, offset: 1.1 },
+  };
+  const curves = {};
+
+  Object.entries(seriesSpec).forEach(([compound, spec]) => {
+    curves[compound] = Array.from({ length: laps }, (_, index) => {
+      const lap = index + 1;
+      const time = predictedLap + spec.offset + index * spec.rate;
+      return { lap, time: Number(time.toFixed(3)) };
+    });
+  });
+
+  return curves;
+}
+
+function getPitTimeline(tyre, raceLaps, pitWindowLap, safetyRisk) {
+  const laps = Number(raceLaps) || 50;
+  let stopCount = { soft: 3, medium: 2, hard: 2, inter: 3, wet: 3 }[tyre] ?? 2;
+  if (safetyRisk === "high") {
+    stopCount = Math.min(3, stopCount + 1);
+  }
+
+  const fractionsByStops = {
+    1: [0.56],
+    2: [0.5, 0.78],
+    3: [0.38, 0.66, 0.84],
+  };
+
+  const shift = { low: 0, medium: -0.02, high: -0.05 }[safetyRisk] ?? 0;
+  const fractions = fractionsByStops[stopCount] || fractionsByStops[2];
+  const pitLaps = [];
+  fractions.forEach((fraction, index) => {
+    let lap = Math.round(laps * (fraction + shift));
+    if (index === 0) {
+      lap = Math.max(lap, Number(pitWindowLap) || lap);
+    }
+    const minLap = pitLaps[index - 1] ? pitLaps[index - 1] + 4 : 4;
+    const maxLap = laps - (stopCount - index);
+    lap = Math.max(minLap, Math.min(maxLap, lap));
+    pitLaps.push(lap);
+  });
+
+  const stintByTyre = {
+    soft: ["Soft", "Medium", "Hard", "Hard"],
+    medium: ["Medium", "Hard", "Hard"],
+    hard: ["Hard", "Medium", "Hard"],
+    inter: ["Inter", "Medium", "Hard", "Hard"],
+    wet: ["Wet", "Inter", "Medium", "Hard"],
+  };
+  const stintOrder = stintByTyre[tyre] || ["Medium", "Hard", "Hard"];
+
+  const timeline = [];
+  let startLap = 1;
+  pitLaps.forEach((pitLap, index) => {
+    timeline.push({
+      compound: stintOrder[Math.min(index, stintOrder.length - 1)],
+      start_lap: startLap,
+      end_lap: pitLap,
+    });
+    startLap = pitLap + 1;
+  });
+  timeline.push({
+    compound: stintOrder[Math.min(pitLaps.length, stintOrder.length - 1)],
+    start_lap: startLap,
+    end_lap: laps,
+  });
+
+  return {
+    timeline,
+    pit_stop_count: pitLaps.length,
+    strategy_label: `${pitLaps.length}-STOP`,
+  };
+}
+
+function toCompoundKey(label) {
+  return String(label || "").trim().toLowerCase();
+}
+
+function applyLegendHighlight(selectedTyre) {
+  if (!compoundLegendEl) {
+    return;
+  }
+  const classes = ["soft", "medium", "hard", "inter", "wet"];
+  classes.forEach((compound) => {
+    const pill = compoundLegendEl.querySelector(`.compound-pill.${compound}`);
+    if (pill) {
+      pill.classList.toggle("active", compound === selectedTyre);
+    }
+  });
+}
+
+function renderDegradationChart(curves) {
+  if (!degradationChartEl) {
+    return;
+  }
+
+  const width = 1180;
+  const height = 320;
+  const padding = { top: 20, right: 18, bottom: 44, left: 72 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  const compounds = ["soft", "medium", "hard", "inter", "wet"];
+  const allSeries = compounds.flatMap((compound) => curves[compound] || []);
+  if (!allSeries.length) {
+    degradationChartEl.innerHTML = "";
+    return;
+  }
+
+  const minLap = 1;
+  const maxLap = Math.max(...allSeries.map((p) => Number(p.lap || 1)));
+  const minTimeRaw = Math.min(...allSeries.map((p) => Number(p.time || 0)));
+  const maxTimeRaw = Math.max(...allSeries.map((p) => Number(p.time || 0)));
+  const minTime = Math.floor(minTimeRaw - 1);
+  const maxTime = Math.ceil(maxTimeRaw + 1);
+
+  const x = (lap) => padding.left + ((lap - minLap) / Math.max(1, (maxLap - minLap))) * innerWidth;
+  const y = (time) => padding.top + ((maxTime - time) / Math.max(0.001, (maxTime - minTime))) * innerHeight;
+
+  const makePath = (series) => {
+    if (!series || !series.length) {
+      return "";
+    }
+    return series
+      .map((point, idx) => `${idx === 0 ? "M" : "L"}${x(Number(point.lap)).toFixed(2)} ${y(Number(point.time)).toFixed(2)}`)
+      .join(" ");
+  };
+
+  const yTicks = 6;
+  const xTicks = Math.min(12, maxLap);
+  const grid = [];
+
+  for (let i = 0; i <= yTicks; i += 1) {
+    const ratio = i / yTicks;
+    const tickTime = maxTime - ratio * (maxTime - minTime);
+    const yy = padding.top + ratio * innerHeight;
+    grid.push(`<line x1="${padding.left}" y1="${yy}" x2="${width - padding.right}" y2="${yy}" stroke="rgba(255,170,170,0.14)" />`);
+    grid.push(`<text x="16" y="${yy + 4}" fill="rgba(255,214,214,0.75)" font-size="11" font-family="Space Grotesk">${formatLapTime(tickTime)}</text>`);
+  }
+
+  for (let i = 0; i <= xTicks; i += 1) {
+    const ratio = i / Math.max(1, xTicks);
+    const tickLap = Math.round(minLap + ratio * (maxLap - minLap));
+    const xx = padding.left + ratio * innerWidth;
+    grid.push(`<line x1="${xx}" y1="${padding.top}" x2="${xx}" y2="${height - padding.bottom}" stroke="rgba(255,170,170,0.1)" />`);
+    grid.push(`<text x="${xx}" y="${height - 16}" text-anchor="middle" fill="rgba(255,214,214,0.72)" font-size="11" font-family="Space Grotesk">${tickLap}</text>`);
+  }
+
+  const pathSpec = {
+    soft: { color: "#74a8ff", width: 2.2, dash: "7 6" },
+    medium: { color: "#f3b300", width: 3.2, dash: "" },
+    hard: { color: "#d6d6d6", width: 2.1, dash: "6 7" },
+    inter: { color: "#27d2ac", width: 2.4, dash: "9 5" },
+    wet: { color: "#8ba4ff", width: 2.4, dash: "2 8" },
+  };
+
+  const paths = compounds
+    .map((compound) => {
+      const series = curves[compound] || [];
+      if (!series.length) {
+        return "";
+      }
+      const spec = pathSpec[compound];
+      const dashAttr = spec.dash ? `stroke-dasharray="${spec.dash}"` : "";
+      return `<path d="${makePath(series)}" fill="none" stroke="${spec.color}" stroke-width="${spec.width}" ${dashAttr} />`;
+    })
+    .join("");
+
+  degradationChartEl.innerHTML = `
+    <rect x="0" y="0" width="${width}" height="${height}" fill="transparent"></rect>
+    ${grid.join("")}
+    ${paths}
+    <text x="${width / 2}" y="${height - 4}" text-anchor="middle" fill="rgba(255,214,214,0.72)" font-size="12" font-family="Space Grotesk">LAP</text>
+  `;
+}
+
+function renderPitTimeline(timeline, raceLaps, strategyLabel) {
+  if (!pitTimelineTrackEl) {
+    return;
+  }
+
+  const safeTimeline = Array.isArray(timeline) ? timeline : [];
+  pitTimelineTrackEl.innerHTML = "";
+  const totalLaps = Number(raceLaps) || 50;
+
+  safeTimeline.forEach((segment) => {
+    const start = Number(segment.start_lap) || 1;
+    const end = Number(segment.end_lap) || start;
+    const laps = Math.max(1, end - start + 1);
+    const width = (laps / totalLaps) * 100;
+    const compoundKey = toCompoundKey(segment.compound);
+
+    const div = document.createElement("div");
+    div.className = `timeline-segment ${compoundKey}`;
+    div.style.width = `${width}%`;
+    div.textContent = segment.compound || "Stint";
+    pitTimelineTrackEl.append(div);
+  });
+
+  const firstSplit = safeTimeline.length > 1 ? safeTimeline[0].end_lap : Math.round(totalLaps * 0.5);
+  timelineStartEl.textContent = "Lap 1";
+  timelineMidEl.textContent = `Lap ${firstSplit}`;
+  timelineEndEl.textContent = `Lap ${totalLaps}`;
+  strategyBadgeEl.textContent = strategyLabel || "--";
+}
+
+function showPostSimulationPanel() {
+  if (!postSimPanelEl) {
+    return;
+  }
+  postSimPanelEl.classList.remove("hidden");
+  postSimPanelEl.classList.add("show");
+}
+
 function setActiveTyre(value) {
   simulationData.selectedTyre = value;
   tyreButtons.forEach((button) => {
@@ -158,6 +387,14 @@ function setActiveTyre(value) {
 function populateDriverDropdown(drivers) {
   const sortedDrivers = [...drivers].sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
   targetDriverSelect.replaceChildren();
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select driver";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  targetDriverSelect.append(placeholder);
+
   sortedDrivers.forEach((driver) => {
     const option = document.createElement("option");
     option.value = String(driver.id);
@@ -168,6 +405,14 @@ function populateDriverDropdown(drivers) {
 
 function populateCircuitDropdown(races) {
   targetCircuitSelect.replaceChildren();
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select circuit";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  targetCircuitSelect.append(placeholder);
+
   races.forEach((race) => {
     const option = document.createElement("option");
     option.value = String(race.round ?? race.circuit_key ?? race.circuit);
@@ -227,14 +472,6 @@ async function initializeApp() {
       populateCircuitDropdown(simulationData.races);
     }
 
-    const monacoRace = simulationData.races.find((race) => {
-      const circuitName = String(race.circuit || "").toLowerCase();
-      return circuitName.includes("monaco");
-    });
-    if (monacoRace?.round) {
-      targetCircuitSelect.value = String(monacoRace.round);
-    }
-
     pitMetaEl.textContent = "Undercut window";
   } catch (error) {
     console.error("Initialization failed, falling back to local mode:", error);
@@ -256,6 +493,13 @@ function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverD
     (circuitImpact[normalizedCircuit] ?? 0) +
     driverDelta;
 
+  const pitTimeline = getPitTimeline(
+    tyre,
+    raceLaps,
+    computePitWindowLap(tyre, race, safetyRisk, track),
+    safetyRisk,
+  );
+
   return {
     predicted_lap: Number((baseLap + totalDelta).toFixed(2)),
     total_delta: Number(totalDelta.toFixed(2)),
@@ -263,6 +507,10 @@ function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverD
     race_total_seconds: Number(((baseLap + totalDelta) * raceLaps).toFixed(2)),
     race_laps: raceLaps,
     pit_window_reason: "Undercut window",
+    degradation_curves: getDegradationCurves(baseLap + totalDelta, raceLaps),
+    pit_strategy_timeline: pitTimeline.timeline,
+    pit_stop_count: pitTimeline.pit_stop_count,
+    strategy_label: pitTimeline.strategy_label,
   };
 }
 
@@ -277,6 +525,11 @@ async function runSimulation() {
 
   if (!Number.isFinite(baseLap) || baseLap <= 0) {
     pitMetaEl.textContent = "Enter a valid base lap time.";
+    return;
+  }
+
+  if (!targetDriverSelect.value || !targetCircuitSelect.value || !track || !safetyRisk) {
+    pitMetaEl.textContent = "Select driver, circuit, track condition, and safety risk.";
     return;
   }
 
@@ -314,6 +567,11 @@ async function runSimulation() {
       data.pit_window_reason,
       selectedTyre,
       selectedDriver,
+      {
+        degradationCurves: data.degradation_curves,
+        pitStrategyTimeline: data.pit_strategy_timeline,
+        strategyLabel: data.strategy_label,
+      },
     );
   } catch (error) {
     console.warn("API call failed, using local fallback:", error);
@@ -334,6 +592,11 @@ async function runSimulation() {
       fallback.pit_window_reason,
       selectedTyre,
       selectedDriver,
+      {
+        degradationCurves: fallback.degradation_curves,
+        pitStrategyTimeline: fallback.pit_strategy_timeline,
+        strategyLabel: fallback.strategy_label,
+      },
     );
   } finally {
     runBtn.disabled = false;
@@ -350,6 +613,7 @@ function updateUI(
   pitWindowReason,
   tyre,
   selectedDriver,
+  analysisData,
 ) {
   predictedTimeEl.textContent = formatLapTime(predictedLap);
   predictedMetaEl.textContent = `${getTyreLabel(tyre)} (${selectedDriver?.number ?? "--"}) at peak`;
@@ -364,6 +628,14 @@ function updateUI(
 
   raceTotalEl.textContent = formatRaceTotal(raceTotalSeconds);
   raceMetaEl.textContent = `${raceLaps ?? "--"} laps`;
+
+  const degradationCurves = analysisData?.degradationCurves || getDegradationCurves(predictedLap, raceLaps);
+  const pitStrategyTimeline = analysisData?.pitStrategyTimeline || [];
+  const strategyLabel = analysisData?.strategyLabel || "--";
+  applyLegendHighlight(tyre);
+  renderDegradationChart(degradationCurves);
+  renderPitTimeline(pitStrategyTimeline, raceLaps, strategyLabel);
+  showPostSimulationPanel();
 }
 
 tyreButtons.forEach((button) => {
