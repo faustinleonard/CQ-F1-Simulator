@@ -14,69 +14,102 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="hero">
-        <p class="eyebrow">Formula 1 Strategy Lab</p>
-        <h1>What-If Race Simulator</h1>
-        <p class="subtitle">
-          Compare tire and track scenarios in real time to estimate lap performance.
-        </p>
-      </section>
+      <section class="race-card" aria-label="Race configuration panel">
+        <header class="race-card-header">
+          <h1>WHAT-IF RACE SIMULATOR</h1>
+          <button type="button" class="setup-btn">Setup</button>
+        </header>
 
-      <section class="control-panel" aria-label="Simulator controls">
-        <div class="field full-row">
-          <label for="targetDriver">Driver Names</label>
-          <select id="targetDriver" class="dropdown" aria-label="Target driver"></select>
+        <div class="config-grid two-col">
+          <div class="field">
+            <label for="targetDriver">Driver</label>
+            <select id="targetDriver" class="dropdown" aria-label="Target driver"></select>
+          </div>
+
+          <div class="field">
+            <label for="targetCircuit">Circuit</label>
+            <select id="targetCircuit" class="dropdown" aria-label="Target circuit"></select>
+          </div>
+        </div>
+
+        <div class="config-grid three-col">
+          <div class="field">
+            <label for="baseLap">Base Lap Time (sec)</label>
+            <input id="baseLap" type="number" value="90" min="60" max="140" step="0.1" />
+          </div>
+
+          <div class="field">
+            <label for="trackCondition">Track Condition</label>
+            <select id="trackCondition" class="dropdown">
+              <option value="optimal">Optimal Grip</option>
+              <option value="hot">Very Hot Asphalt</option>
+              <option value="cold">Cold Surface</option>
+              <option value="green">Green Track</option>
+              <option value="damp">Damp</option>
+              <option value="wet">Wet</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="safetyCarRisk">Safety Car Risk</label>
+            <select id="safetyCarRisk" class="dropdown">
+              <option value="low">Low (10%)</option>
+              <option value="medium">Medium (35%)</option>
+              <option value="high">High (60%)</option>
+            </select>
+          </div>
         </div>
 
         <div class="field">
-          <label for="baseLap">Base Lap Time (seconds)</label>
-          <input id="baseLap" type="number" value="90" min="60" max="140" step="0.1" />
-        </div>
-
-        <div class="field">
-          <label for="tireCondition">Tire Condition</label>
-          <select id="tireCondition" class="dropdown">
-            <option value="new_soft">New Soft</option>
-            <option value="new_medium">New Medium</option>
-            <option value="new_hard">New Hard</option>
-            <option value="worn_soft">Worn Soft</option>
-            <option value="worn_medium">Worn Medium</option>
-            <option value="worn_hard">Worn Hard</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="wet">Full Wet</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="trackCondition">Track Condition</label>
-          <select id="trackCondition" class="dropdown">
-            <option value="optimal">Optimal Grip</option>
-            <option value="hot">Very Hot Asphalt</option>
-            <option value="cold">Cold Surface</option>
-            <option value="green">Green Track</option>
-            <option value="damp">Damp</option>
-            <option value="wet">Wet</option>
-          </select>
+          <label>Tyre Compound</label>
+          <div class="tyre-compounds" role="radiogroup" aria-label="Tyre compound selector">
+            <button type="button" class="tyre-btn active" data-tyre="soft" aria-pressed="true">
+              <span class="dot dot-soft" aria-hidden="true"></span>
+              Soft
+            </button>
+            <button type="button" class="tyre-btn" data-tyre="medium" aria-pressed="false">
+              <span class="dot dot-medium" aria-hidden="true"></span>
+              Medium
+            </button>
+            <button type="button" class="tyre-btn" data-tyre="hard" aria-pressed="false">
+              <span class="dot dot-hard" aria-hidden="true"></span>
+              Hard
+            </button>
+            <button type="button" class="tyre-btn" data-tyre="inter" aria-pressed="false">
+              <span class="dot dot-inter" aria-hidden="true"></span>
+              Inter
+            </button>
+            <button type="button" class="tyre-btn" data-tyre="wet" aria-pressed="false">
+              <span class="dot dot-wet" aria-hidden="true"></span>
+              Wet
+            </button>
+          </div>
         </div>
 
         <button id="simulateBtn" class="simulate-btn" type="button">Run Simulation</button>
-      </section>
 
-      <section class="results" aria-live="polite">
-        <article class="result-card">
-          <h2>Predicted Lap Time</h2>
-          <p id="predictedTime" class="result-value">--</p>
-        </article>
-
-        <article class="result-card">
-          <h2>Time Delta</h2>
-          <p id="timeDelta" class="result-value">--</p>
-        </article>
-
-        <article class="result-card">
-          <h2>Strategy Note</h2>
-          <p id="strategyNote" class="strategy-note">Pick conditions and run simulation.</p>
-        </article>
+        <section class="results" aria-live="polite">
+          <article class="result-card">
+            <h2>Predicted Lap</h2>
+            <p id="predictedTime" class="result-value">--</p>
+            <p id="predictedMeta" class="result-subtitle">Tyre setup</p>
+          </article>
+          <article class="result-card">
+            <h2>Time Delta</h2>
+            <p id="timeDelta" class="result-value">--</p>
+            <p id="deltaMeta" class="result-subtitle">vs dry baseline</p>
+          </article>
+          <article class="result-card">
+            <h2>Pit Window</h2>
+            <p id="pitWindow" class="result-value">--</p>
+            <p id="pitMeta" class="result-subtitle">Undercut window</p>
+          </article>
+          <article class="result-card">
+            <h2>Race Total</h2>
+            <p id="raceTotal" class="result-value">--</p>
+            <p id="raceMeta" class="result-subtitle">-- laps</p>
+          </article>
+        </section>
       </section>
     </main>
 

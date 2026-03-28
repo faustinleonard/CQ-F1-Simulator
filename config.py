@@ -9,7 +9,7 @@ class Config:
     """Base configuration."""
     
     # Flask settings
-    DEBUG = False
+    DEBUG = False 
     TESTING = False
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-key-change-in-production")
     

@@ -3,44 +3,177 @@ const API_BASE = "http://localhost:5000/api";
 
 // DOM Elements
 const baseLapInput = document.getElementById("baseLap");
-const tireSelect = document.getElementById("tireCondition");
 const trackSelect = document.getElementById("trackCondition");
+const safetyCarSelect = document.getElementById("safetyCarRisk");
 const targetDriverSelect = document.getElementById("targetDriver");
+const targetCircuitSelect = document.getElementById("targetCircuit");
 const runBtn = document.getElementById("simulateBtn");
+const tyreButtons = Array.from(document.querySelectorAll(".tyre-btn"));
 const predictedTimeEl = document.getElementById("predictedTime");
+const predictedMetaEl = document.getElementById("predictedMeta");
 const deltaEl = document.getElementById("timeDelta");
-const strategyNoteEl = document.getElementById("strategyNote");
+const deltaMetaEl = document.getElementById("deltaMeta");
+const pitWindowEl = document.getElementById("pitWindow");
+const pitMetaEl = document.getElementById("pitMeta");
+const raceTotalEl = document.getElementById("raceTotal");
+const raceMetaEl = document.getElementById("raceMeta");
 
 // State
-let simulationData = {
+const simulationData = {
   drivers: [],
+  races: [],
+  selectedTyre: "soft",
 };
 
 const fallbackDrivers = [
-  { id: 1, name: "Max Verstappen", number: 1, team: "Red Bull Racing", position: 1 },
+  { id: 1, name: "Max Verstappen", number: 1, team: "Red Bull", position: 1 },
   { id: 2, name: "Lando Norris", number: 4, team: "McLaren", position: 2 },
   { id: 3, name: "Lewis Hamilton", number: 44, team: "Mercedes", position: 3 },
-  { id: 4, name: "Carlos Sainz", number: 55, team: "Ferrari", position: 4 },
-  { id: 5, name: "Charles Leclerc", number: 16, team: "Ferrari", position: 5 },
+  { id: 4, name: "Charles Leclerc", number: 16, team: "Ferrari", position: 4 },
+  { id: 5, name: "George Russell", number: 63, team: "Mercedes", position: 5 },
   { id: 6, name: "Oscar Piastri", number: 81, team: "McLaren", position: 6 },
-  { id: 7, name: "George Russell", number: 63, team: "Mercedes", position: 7 },
-  { id: 8, name: "Fernando Alonso", number: 14, team: "Aston Martin", position: 8 },
 ];
 
-function populateDriverDropdown(drivers) {
-  const sortedDrivers = [...drivers].sort((a, b) => {
-    const aPos = Number.isFinite(a.position) ? a.position : Number.MAX_SAFE_INTEGER;
-    const bPos = Number.isFinite(b.position) ? b.position : Number.MAX_SAFE_INTEGER;
-    return aPos - bPos;
+const fallbackRaces = [
+  { round: 1, circuit: "Monaco", circuit_key: "monaco", laps: 78, length_km: 3.337 },
+  { round: 2, circuit: "Monza", circuit_key: "monza", laps: 53, length_km: 5.793 },
+  { round: 3, circuit: "Silverstone", circuit_key: "silverstone", laps: 52, length_km: 5.891 },
+  { round: 4, circuit: "Spa-Francorchamps", circuit_key: "spa-francorchamps", laps: 44, length_km: 7.004 },
+  { round: 5, circuit: "Suzuka", circuit_key: "suzuka", laps: 53, length_km: 5.807 },
+];
+
+const tyreImpact = {
+  soft: -0.8,
+  medium: -0.25,
+  hard: 0.2,
+  inter: 2.0,
+  wet: 3.8,
+};
+
+const trackImpact = {
+  optimal: -0.4,
+  hot: 0.7,
+  cold: 0.45,
+  green: 1.0,
+  damp: 2.4,
+  wet: 5.2,
+};
+
+const safetyImpact = {
+  low: 0,
+  medium: 0.35,
+  high: 0.85,
+};
+
+const circuitImpact = {
+  monaco: 1.8,
+  monza: -1.0,
+  silverstone: -0.4,
+  "spa-francorchamps": -0.2,
+  suzuka: -0.15,
+  bahrain: 0.5,
+  jeddah: 0.25,
+  "albert-park": 0.4,
+  shanghai: 0.3,
+};
+
+function formatCircuitLabel(race) {
+  const laps = Number.isFinite(race.laps) ? `${race.laps} laps` : "laps n/a";
+  const km = Number.isFinite(race.length_km) ? `${race.length_km.toFixed(3)}km` : "length n/a";
+  return `${race.circuit} - ${laps} (${km})`;
+}
+
+function formatLapTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "--";
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toFixed(3).padStart(6, "0")}`;
+}
+
+function formatRaceTotal(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "--";
+  }
+  const totalSeconds = Math.round(seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${secs}s`;
+  }
+  return `${minutes}m ${secs}s`;
+}
+
+function getTyreLabel(tyre) {
+  const labels = {
+    soft: "Soft",
+    medium: "Medium",
+    hard: "Hard",
+    inter: "Inter",
+    wet: "Wet",
+  };
+  return labels[tyre] ?? "Unknown";
+}
+
+function computePitWindowLap(tyre, race, safetyRisk, track) {
+  const totalLaps = Number(race?.laps) || 50;
+  const baseRatio = {
+    soft: 0.42,
+    medium: 0.50,
+    hard: 0.58,
+    inter: 0.45,
+    wet: 0.38,
+  }[tyre] ?? 0.5;
+
+  const riskAdjust = {
+    low: 0,
+    medium: -0.03,
+    high: -0.07,
+  }[safetyRisk] ?? 0;
+
+  const trackAdjust = {
+    optimal: 0,
+    hot: -0.03,
+    cold: 0.01,
+    green: -0.02,
+    damp: -0.06,
+    wet: -0.09,
+  }[track] ?? 0;
+
+  const ratio = Math.min(0.72, Math.max(0.25, baseRatio + riskAdjust + trackAdjust));
+  return Math.round(totalLaps * ratio);
+}
+
+function setActiveTyre(value) {
+  simulationData.selectedTyre = value;
+  tyreButtons.forEach((button) => {
+    const isActive = button.dataset.tyre === value;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
+}
 
+function populateDriverDropdown(drivers) {
+  const sortedDrivers = [...drivers].sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
   targetDriverSelect.replaceChildren();
-
   sortedDrivers.forEach((driver) => {
     const option = document.createElement("option");
     option.value = String(driver.id);
-    option.textContent = `#${driver.number} ${driver.name} (${driver.team})`;
+    option.textContent = `#${driver.number} ${driver.name} - ${driver.team}`;
     targetDriverSelect.append(option);
+  });
+}
+
+function populateCircuitDropdown(races) {
+  targetCircuitSelect.replaceChildren();
+  races.forEach((race) => {
+    const option = document.createElement("option");
+    option.value = String(race.round ?? race.circuit_key ?? race.circuit);
+    option.dataset.circuitKey = race.circuit_key || String(race.circuit || "").toLowerCase();
+    option.textContent = formatCircuitLabel(race);
+    targetCircuitSelect.append(option);
   });
 }
 
@@ -49,104 +182,108 @@ function getSelectedDriver() {
   return simulationData.drivers.find((driver) => driver.id === selectedId) ?? null;
 }
 
+function getSelectedRace() {
+  const selectedRound = Number(targetCircuitSelect.value);
+  if (Number.isFinite(selectedRound)) {
+    return simulationData.races.find((race) => race.round === selectedRound) ?? null;
+  }
+  return simulationData.races[0] ?? null;
+}
+
 function getDriverDelta(driver) {
   if (!driver || !Number.isFinite(driver.position)) {
     return 0;
   }
-
-  // Better championship position implies slightly faster expected pace.
-  const baselinePosition = 4;
+  const baselinePosition = 5;
   const stepPerPosition = 0.12;
   return (driver.position - baselinePosition) * stepPerPosition;
 }
 
-/**
- * Initialize app by fetching reference data from backend.
- */
 async function initializeApp() {
+  pitMetaEl.textContent = "Loading setup data...";
+
   try {
-    // Check backend health
     const healthRes = await fetch(`${API_BASE}/health`);
     if (!healthRes.ok) {
-      throw new Error("Backend server is not running");
+      throw new Error("Backend server is unavailable");
     }
 
-    strategyNoteEl.textContent = "Fetching simulation data...";
-
-    const [driverRes, raceRes] = await Promise.all([
-      fetch(`${API_BASE}/drivers`),
-      fetch(`${API_BASE}/races`),
-    ]);
-
-    if (driverRes.ok) {
-      simulationData.drivers = await driverRes.json();
-      if (simulationData.drivers.length > 0) {
-        populateDriverDropdown(simulationData.drivers);
-      }
-    }
-
-    if (simulationData.drivers.length === 0) {
-      simulationData.drivers = fallbackDrivers;
+    const configRes = await fetch(`${API_BASE}/race-config`);
+    if (configRes.ok) {
+      const config = await configRes.json();
+      simulationData.drivers = config.drivers?.length ? config.drivers : fallbackDrivers;
+      simulationData.races = config.races?.length ? config.races : fallbackRaces;
       populateDriverDropdown(simulationData.drivers);
+      populateCircuitDropdown(simulationData.races);
+    } else {
+      const [driverRes, racesRes] = await Promise.all([
+        fetch(`${API_BASE}/drivers`),
+        fetch(`${API_BASE}/races`),
+      ]);
+
+      simulationData.drivers = driverRes.ok ? await driverRes.json() : fallbackDrivers;
+      simulationData.races = racesRes.ok ? await racesRes.json() : fallbackRaces;
+      populateDriverDropdown(simulationData.drivers);
+      populateCircuitDropdown(simulationData.races);
     }
 
-    if (raceRes.ok) {
-      const races = await raceRes.json();
-      console.log(`✓ Connected to backend. ${races.length} races loaded.`);
+    const monacoRace = simulationData.races.find((race) => {
+      const circuitName = String(race.circuit || "").toLowerCase();
+      return circuitName.includes("monaco");
+    });
+    if (monacoRace?.round) {
+      targetCircuitSelect.value = String(monacoRace.round);
     }
 
+    pitMetaEl.textContent = "Undercut window";
   } catch (error) {
-    console.error("Failed to initialize app:", error);
-    strategyNoteEl.textContent =
-      "⚠️ Backend unavailable. Using local simulation mode.";
-
+    console.error("Initialization failed, falling back to local mode:", error);
     simulationData.drivers = fallbackDrivers;
+    simulationData.races = fallbackRaces;
     populateDriverDropdown(simulationData.drivers);
+    populateCircuitDropdown(simulationData.races);
+    pitMetaEl.textContent = "Local mode active";
   }
 }
 
-/**
- * Get strategy note based on tire, track, and delta.
- */
-function getStrategyNote(tire, track, delta, driverName) {
-  const prefix = driverName ? `${driverName}: ` : "";
+function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverDelta = 0) {
+  const normalizedCircuit = String(race?.circuit_key || race?.circuit || "").toLowerCase().replaceAll(" ", "-");
+  const raceLaps = Number(race?.laps) || 50;
+  const totalDelta =
+    (tyreImpact[tyre] ?? 0) +
+    (trackImpact[track] ?? 0) +
+    (safetyImpact[safetyRisk] ?? 0) +
+    (circuitImpact[normalizedCircuit] ?? 0) +
+    driverDelta;
 
-  if (track === "wet" && tire !== "wet") {
-    return `${prefix}Wet track and wrong tire: high risk, plan an immediate pit stop.`;
-  }
-
-  if (track === "damp" && tire !== "intermediate" && tire !== "wet") {
-    return `${prefix}Damp conditions favor intermediate tires for safer pace.`;
-  }
-
-  if (delta <= 0) {
-    return `${prefix}Current setup is competitive. Extend the stint if tire wear allows.`;
-  }
-
-  if (delta > 2) {
-    return `${prefix}Lap time loss is significant. Undercut window may be opening.`;
-  }
-
-  return `${prefix}Pace is acceptable, but monitor degradation and track evolution.`;
+  return {
+    predicted_lap: Number((baseLap + totalDelta).toFixed(2)),
+    total_delta: Number(totalDelta.toFixed(2)),
+    pit_window_lap: computePitWindowLap(tyre, race, safetyRisk, track),
+    race_total_seconds: Number(((baseLap + totalDelta) * raceLaps).toFixed(2)),
+    race_laps: raceLaps,
+    pit_window_reason: "Undercut window",
+  };
 }
 
-/**
- * Run simulation via backend API or fallback to local calculation.
- */
 async function runSimulation() {
   const baseLap = Number(baseLapInput.value);
-  const tire = tireSelect.value;
   const track = trackSelect.value;
+  const safetyRisk = safetyCarSelect.value;
+  const selectedTyre = simulationData.selectedTyre;
   const selectedDriver = getSelectedDriver();
+  const selectedRace = getSelectedRace();
   const driverDelta = getDriverDelta(selectedDriver);
 
   if (!Number.isFinite(baseLap) || baseLap <= 0) {
-    strategyNoteEl.textContent = "Enter a valid base lap time before simulation.";
+    pitMetaEl.textContent = "Enter a valid base lap time.";
     return;
   }
 
+  runBtn.disabled = true;
+  runBtn.textContent = "Running...";
+
   try {
-    // Call backend API for lap time simulation
     const response = await fetch(`${API_BASE}/simulate/lap`, {
       method: "POST",
       headers: {
@@ -154,8 +291,12 @@ async function runSimulation() {
       },
       body: JSON.stringify({
         base_lap: baseLap,
-        tire_condition: tire,
+        tyre_compound: selectedTyre,
         track_condition: track,
+        safety_car_risk: safetyRisk,
+        round: selectedRace?.round,
+        circuit: selectedRace?.circuit_key || selectedRace?.circuit,
+        driver_id: selectedDriver?.id,
       }),
     });
 
@@ -167,62 +308,72 @@ async function runSimulation() {
     updateUI(
       data.predicted_lap + driverDelta,
       data.total_delta + driverDelta,
-      tire,
-      track,
-      selectedDriver?.name,
+      data.pit_window_lap,
+      data.race_total_seconds,
+      data.race_laps,
+      data.pit_window_reason,
+      selectedTyre,
+      selectedDriver,
     );
   } catch (error) {
-    console.warn("API call failed, using local simulation:", error);
-    localFallbackSimulation(baseLap, tire, track, selectedDriver?.name, driverDelta);
+    console.warn("API call failed, using local fallback:", error);
+    const fallback = localFallbackSimulation(
+      baseLap,
+      selectedTyre,
+      track,
+      safetyRisk,
+      selectedRace,
+      driverDelta,
+    );
+    updateUI(
+      fallback.predicted_lap,
+      fallback.total_delta,
+      fallback.pit_window_lap,
+      fallback.race_total_seconds,
+      fallback.race_laps,
+      fallback.pit_window_reason,
+      selectedTyre,
+      selectedDriver,
+    );
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = "Run Simulation";
   }
 }
 
-/**
- * Local fallback simulation (no backend required).
- */
-function localFallbackSimulation(baseLap, tire, track, driverName, driverDelta = 0) {
-  const tireImpact = {
-    new_soft: -0.8,
-    new_medium: -0.25,
-    new_hard: 0.2,
-    worn_soft: 1.4,
-    worn_medium: 0.9,
-    worn_hard: 0.55,
-    intermediate: 2.0,
-    wet: 3.8,
-  };
+function updateUI(
+  predictedLap,
+  totalDelta,
+  pitWindowLap,
+  raceTotalSeconds,
+  raceLaps,
+  pitWindowReason,
+  tyre,
+  selectedDriver,
+) {
+  predictedTimeEl.textContent = formatLapTime(predictedLap);
+  predictedMetaEl.textContent = `${getTyreLabel(tyre)} (${selectedDriver?.number ?? "--"}) at peak`;
 
-  const trackImpact = {
-    optimal: -0.4,
-    hot: 0.7,
-    cold: 0.45,
-    green: 1.0,
-    damp: 2.4,
-    wet: 5.2,
-  };
-
-  const tireDelta = tireImpact[tire] ?? 0;
-  const trackDelta = trackImpact[track] ?? 0;
-  const totalDelta = tireDelta + trackDelta + driverDelta;
-  const predictedLap = baseLap + totalDelta;
-
-  updateUI(predictedLap, totalDelta, tire, track, driverName);
-}
-
-/**
- * Update UI with simulation results.
- */
-function updateUI(predictedLap, totalDelta, tire, track, driverName) {
-  predictedTimeEl.textContent = `${predictedLap.toFixed(2)} s`;
-  deltaEl.textContent = `${totalDelta > 0 ? "+" : ""}${totalDelta.toFixed(2)} s`;
+  deltaEl.textContent = `${totalDelta > 0 ? "+" : ""}${totalDelta.toFixed(3)}s`;
   deltaEl.classList.remove("positive", "negative");
   deltaEl.classList.add(totalDelta > 0 ? "positive" : "negative");
+  deltaMetaEl.textContent = "vs dry baseline";
 
-  strategyNoteEl.textContent = getStrategyNote(tire, track, totalDelta, driverName);
+  pitWindowEl.textContent = `Lap ${pitWindowLap ?? "--"}`;
+  pitMetaEl.textContent = pitWindowReason || "Undercut window";
+
+  raceTotalEl.textContent = formatRaceTotal(raceTotalSeconds);
+  raceMetaEl.textContent = `${raceLaps ?? "--"} laps`;
 }
 
-// Event Listeners
-runBtn.addEventListener("click", runSimulation);
+tyreButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setActiveTyre(button.dataset.tyre);
+  });
+});
 
-// Initialize app on load
-window.addEventListener("DOMContentLoaded", initializeApp);
+runBtn.addEventListener("click", runSimulation);
+window.addEventListener("DOMContentLoaded", () => {
+  setActiveTyre("soft");
+  initializeApp();
+});

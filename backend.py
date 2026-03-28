@@ -40,8 +40,54 @@ class RaceSimulator:
             "damp": 2.4,
             "wet": 5.2,
         }
+
+        self.tyre_compound_map = {
+            "soft": "new_soft",
+            "medium": "new_medium",
+            "hard": "new_hard",
+            "inter": "intermediate",
+            "wet": "wet",
+        }
+
+        self.safety_car_risk_impact = {
+            "low": 0.0,
+            "medium": 0.35,
+            "high": 0.85,
+        }
+
+        self.circuit_impact = {
+            "monaco": 1.8,
+            "monza": -1.0,
+            "silverstone": -0.4,
+            "spa-francorchamps": -0.2,
+            "suzuka": -0.15,
+            "bahrain": 0.5,
+            "jeddah": 0.25,
+            "albert-park": 0.4,
+            "shanghai": 0.3,
+        }
         
         self.strategies = self._load_strategies()
+
+    def normalize_tire(self, tire=None, tyre_compound=None):
+        """Normalize legacy tire conditions and UI tyre compounds."""
+        if tyre_compound:
+            return self.tyre_compound_map.get(str(tyre_compound).lower(), str(tyre_compound).lower())
+        if tire:
+            return str(tire).lower()
+        return "new_medium"
+
+    def normalize_safety_risk(self, safety_car_risk):
+        """Normalize safety car risk labels to expected keys."""
+        normalized = str(safety_car_risk or "low").strip().lower()
+        return normalized if normalized in self.safety_car_risk_impact else "low"
+
+    def normalize_circuit_key(self, circuit):
+        """Get a normalized circuit key used in circuit_impact."""
+        if not circuit:
+            return ""
+        normalized = str(circuit).strip().lower().replace("_", "-").replace(" ", "-")
+        return normalized
     
     def _load_strategies(self):
         """Load predefined pit stop strategies."""
@@ -68,18 +114,54 @@ class RaceSimulator:
             }
         }
     
-    def predict_lap_time(self, base_lap, tire, track):
+    def predict_lap_time(self, base_lap, tire, track, safety_car_risk="low", circuit=""):
         """Predict adjusted lap time from conditions."""
         tire_delta = self.tire_impact.get(tire, 0)
         track_delta = self.track_impact.get(track, 0)
-        adjusted_lap = base_lap + tire_delta + track_delta
+        safety_key = self.normalize_safety_risk(safety_car_risk)
+        safety_car_delta = self.safety_car_risk_impact[safety_key]
+        circuit_key = self.normalize_circuit_key(circuit)
+        circuit_delta = self.circuit_impact.get(circuit_key, 0)
+        adjusted_lap = base_lap + tire_delta + track_delta + safety_car_delta + circuit_delta
         return {
             "base_lap": base_lap,
+            "circuit": circuit,
+            "circuit_delta": circuit_delta,
             "tire_delta": tire_delta,
             "track_delta": track_delta,
-            "total_delta": tire_delta + track_delta,
+            "safety_car_risk": safety_key,
+            "safety_car_delta": safety_car_delta,
+            "total_delta": tire_delta + track_delta + safety_car_delta + circuit_delta,
             "predicted_lap": round(adjusted_lap, 2)
         }
+
+    def estimate_pit_window_lap(self, tyre_compound, race_laps, safety_car_risk, track):
+        """Estimate first pit window lap based on setup conditions."""
+        base_ratio = {
+            "soft": 0.42,
+            "medium": 0.50,
+            "hard": 0.58,
+            "inter": 0.45,
+            "wet": 0.38,
+        }.get(str(tyre_compound or "medium").lower(), 0.50)
+
+        risk_adjust = {
+            "low": 0.0,
+            "medium": -0.03,
+            "high": -0.07,
+        }.get(self.normalize_safety_risk(safety_car_risk), 0.0)
+
+        track_adjust = {
+            "optimal": 0.0,
+            "hot": -0.03,
+            "cold": 0.01,
+            "green": -0.02,
+            "damp": -0.06,
+            "wet": -0.09,
+        }.get(str(track or "optimal").lower(), 0.0)
+
+        ratio = max(0.25, min(0.72, base_ratio + risk_adjust + track_adjust))
+        return max(1, int(round(race_laps * ratio)))
     
     def predict_race_finish(self, starting_position, strategy, num_laps, 
                            base_lap, tire, track, reliability=1.0):
@@ -126,16 +208,51 @@ def generate_mock_f1_data():
     """Generate mock F1 2025 season data for demo purposes."""
     
     races = [
-        {"round": 1, "country": "Bahrain", "circuit": "Bahrain International Circuit", 
-         "date": "2025-03-02", "laps": 57},
-        {"round": 2, "country": "Saudi Arabia", "circuit": "Jeddah Corniche Circuit", 
-         "date": "2025-03-09", "laps": 50},
-        {"round": 3, "country": "Australia", "circuit": "Albert Park Circuit", 
-         "date": "2025-03-23", "laps": 58},
-        {"round": 4, "country": "Japan", "circuit": "Suzuka International Racing Course", 
-         "date": "2025-04-06", "laps": 53},
-        {"round": 5, "country": "China", "circuit": "Shanghai International Circuit", 
-         "date": "2025-04-13", "laps": 56},
+        {
+            "round": 1,
+            "country": "Monaco",
+            "circuit": "Monaco",
+            "circuit_key": "monaco",
+            "date": "2025-05-25",
+            "laps": 78,
+            "length_km": 3.337,
+        },
+        {
+            "round": 2,
+            "country": "Italy",
+            "circuit": "Monza",
+            "circuit_key": "monza",
+            "date": "2025-09-07",
+            "laps": 53,
+            "length_km": 5.793,
+        },
+        {
+            "round": 3,
+            "country": "United Kingdom",
+            "circuit": "Silverstone",
+            "circuit_key": "silverstone",
+            "date": "2025-07-06",
+            "laps": 52,
+            "length_km": 5.891,
+        },
+        {
+            "round": 4,
+            "country": "Belgium",
+            "circuit": "Spa-Francorchamps",
+            "circuit_key": "spa-francorchamps",
+            "date": "2025-07-27",
+            "laps": 44,
+            "length_km": 7.004,
+        },
+        {
+            "round": 5,
+            "country": "Japan",
+            "circuit": "Suzuka",
+            "circuit_key": "suzuka",
+            "date": "2025-04-06",
+            "laps": 53,
+            "length_km": 5.807,
+        },
     ]
     
     drivers = [
@@ -313,20 +430,65 @@ def simulate_lap():
     Body:
     {
         "base_lap": float,
-        "tire_condition": string,
-        "track_condition": string
+        "tire_condition": string,        # legacy key
+        "tyre_compound": string,         # soft|medium|hard|inter|wet
+        "track_condition": string,
+        "safety_car_risk": string,       # low|medium|high
+        "circuit": string,
+        "round": int
     }
     """
     data = request.get_json()
-    
-    if not data or "base_lap" not in data or "tire_condition" not in data or "track_condition" not in data:
+
+    if not data or "base_lap" not in data or "track_condition" not in data:
         return jsonify({"error": "Missing required fields"}), 400
+
+    tyre_compound = data.get("tyre_compound")
+    tire_condition = simulator.normalize_tire(data.get("tire_condition"), tyre_compound)
+
+    round_num = data.get("round")
+    selected_race = None
+    if round_num is not None:
+        selected_race = next((r for r in f1_data["races"] if r["round"] == int(round_num)), None)
+
+    circuit = data.get("circuit")
+    if selected_race:
+        circuit = selected_race.get("circuit_key", selected_race.get("circuit", circuit))
+
+    if not circuit:
+        circuit = "monaco"
     
+    track_condition = str(data["track_condition"]).lower()
+    safety_car_risk = data.get("safety_car_risk", "low")
+
     result = simulator.predict_lap_time(
         float(data["base_lap"]),
-        data["tire_condition"],
-        data["track_condition"]
+        tire_condition,
+        track_condition,
+        safety_car_risk,
+        circuit,
     )
+
+    race_laps = 50
+    if selected_race and "laps" in selected_race:
+        race_laps = int(selected_race["laps"])
+
+    pit_window_lap = simulator.estimate_pit_window_lap(
+        tyre_compound,
+        race_laps,
+        safety_car_risk,
+        track_condition,
+    )
+
+    race_total_seconds = round(result["predicted_lap"] * race_laps, 2)
+
+    result["tyre_compound"] = tyre_compound
+    result["tire_condition"] = tire_condition
+    result["round"] = round_num
+    result["race_laps"] = race_laps
+    result["pit_window_lap"] = pit_window_lap
+    result["pit_window_reason"] = "Undercut window"
+    result["race_total_seconds"] = race_total_seconds
     
     return jsonify(result)
 
@@ -446,6 +608,39 @@ def get_track_conditions():
         "wet": {"description": "Wet track, standing water", "grip_level": 0.45},
     }
     return jsonify(conditions)
+
+
+@app.route("/api/safety-car-risks", methods=["GET"])
+def get_safety_car_risks():
+    """Get available safety car risk levels."""
+    return jsonify({
+        "low": {"label": "Low (10%)", "impact": simulator.safety_car_risk_impact["low"]},
+        "medium": {"label": "Medium (35%)", "impact": simulator.safety_car_risk_impact["medium"]},
+        "high": {"label": "High (60%)", "impact": simulator.safety_car_risk_impact["high"]},
+    })
+
+
+@app.route("/api/race-config", methods=["GET"])
+def get_race_config():
+    """Get all UI options for race configuration."""
+    return jsonify({
+        "drivers": f1_data["drivers"],
+        "races": f1_data["races"],
+        "track_conditions": {
+            "optimal": "Optimal Grip",
+            "hot": "Very Hot Asphalt",
+            "cold": "Cold Surface",
+            "green": "Green Track",
+            "damp": "Damp",
+            "wet": "Wet",
+        },
+        "safety_car_risk": {
+            "low": "Low (10%)",
+            "medium": "Medium (35%)",
+            "high": "High (60%)",
+        },
+        "tyre_compounds": ["soft", "medium", "hard", "inter", "wet"],
+    })
 
 
 # ============================================================================
