@@ -258,6 +258,60 @@ class RaceSimulator:
             "pit_stop_count": len(pit_laps),
             "strategy_label": f"{len(pit_laps)}-STOP",
         }
+
+    def build_compound_comparison(self, base_predicted_lap, race_laps, safety_car_risk, track):
+        """Build comparison metrics for all five compounds."""
+        race_laps = max(1, int(race_laps))
+        safety_key = self.normalize_safety_risk(safety_car_risk)
+
+        # Baseline pace/degradation model per compound.
+        specs = {
+            "soft": {"offset": -0.25, "deg": 0.28, "life_ratio": 0.24},
+            "medium": {"offset": 0.0, "deg": 0.18, "life_ratio": 0.36},
+            "hard": {"offset": 0.15, "deg": 0.10, "life_ratio": 0.52},
+            "inter": {"offset": 0.6, "deg": 0.24, "life_ratio": 0.28},
+            "wet": {"offset": 1.1, "deg": 0.34, "life_ratio": 0.22},
+        }
+
+        track_delta = {
+            "optimal": 0.0,
+            "hot": 0.08,
+            "cold": 0.03,
+            "green": 0.06,
+            "damp": 0.12,
+            "wet": 0.2,
+        }.get(str(track or "optimal").lower(), 0.0)
+
+        risk_life_shift = {
+            "low": 0.0,
+            "medium": -0.03,
+            "high": -0.06,
+        }[safety_key]
+
+        comparison = []
+        for compound, spec in specs.items():
+            avg_lap = base_predicted_lap + spec["offset"] + track_delta
+            best_lap = avg_lap - 3.85
+
+            tyre_life = int(round(race_laps * (spec["life_ratio"] + risk_life_shift)))
+            tyre_life = max(10, min(race_laps - 1, tyre_life))
+
+            optimal_stop = int(round(tyre_life * 1.15))
+            optimal_stop = max(6, min(race_laps - 1, optimal_stop))
+
+            comparison.append({
+                "compound": compound,
+                "avg_lap_seconds": round(avg_lap, 3),
+                "best_lap_seconds": round(best_lap, 3),
+                "optimal_stop_lap": optimal_stop,
+                "tyre_life_laps": tyre_life,
+            })
+
+        fastest = min(comparison, key=lambda x: x["avg_lap_seconds"])["compound"]
+        return {
+            "comparison": comparison,
+            "fastest_compound": fastest,
+        }
     
     def predict_race_finish(self, starting_position, strategy, num_laps, 
                            base_lap, tire, track, reliability=1.0):
@@ -584,6 +638,12 @@ def simulate_lap():
         pit_window_lap,
         safety_car_risk,
     )
+    compound_comparison = simulator.build_compound_comparison(
+        result["predicted_lap"],
+        race_laps,
+        safety_car_risk,
+        track_condition,
+    )
 
     result["tyre_compound"] = tyre_compound
     result["tire_condition"] = tire_condition
@@ -596,6 +656,8 @@ def simulate_lap():
     result["pit_strategy_timeline"] = pit_strategy["timeline"]
     result["pit_stop_count"] = pit_strategy["pit_stop_count"]
     result["strategy_label"] = pit_strategy["strategy_label"]
+    result["compound_comparison"] = compound_comparison["comparison"]
+    result["fastest_compound"] = compound_comparison["fastest_compound"]
     
     return jsonify(result)
 

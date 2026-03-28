@@ -25,6 +25,7 @@ const timelineStartEl = document.getElementById("timelineStart");
 const timelineMidEl = document.getElementById("timelineMid");
 const timelineEndEl = document.getElementById("timelineEnd");
 const compoundLegendEl = document.getElementById("compoundLegend");
+const compoundComparisonGridEl = document.getElementById("compoundComparisonGrid");
 
 // State
 const simulationData = {
@@ -235,6 +236,55 @@ function getPitTimeline(tyre, raceLaps, pitWindowLap, safetyRisk) {
   };
 }
 
+function getCompoundComparison(predictedLap, raceLaps, safetyRisk, track) {
+  const laps = Number(raceLaps) || 50;
+  const specs = {
+    soft: { offset: -0.25, deg: 0.28, lifeRatio: 0.24 },
+    medium: { offset: 0.0, deg: 0.18, lifeRatio: 0.36 },
+    hard: { offset: 0.15, deg: 0.1, lifeRatio: 0.52 },
+    inter: { offset: 0.6, deg: 0.24, lifeRatio: 0.28 },
+    wet: { offset: 1.1, deg: 0.34, lifeRatio: 0.22 },
+  };
+
+  const trackDelta = {
+    optimal: 0,
+    hot: 0.08,
+    cold: 0.03,
+    green: 0.06,
+    damp: 0.12,
+    wet: 0.2,
+  }[track] ?? 0;
+
+  const riskLifeShift = {
+    low: 0,
+    medium: -0.03,
+    high: -0.06,
+  }[safetyRisk] ?? 0;
+
+  const comparison = Object.entries(specs).map(([compound, spec]) => {
+    const avg = predictedLap + spec.offset + trackDelta;
+    const best = avg - 3.85;
+    const life = Math.max(10, Math.min(laps - 1, Math.round(laps * (spec.lifeRatio + riskLifeShift))));
+    const optimalStop = Math.max(6, Math.min(laps - 1, Math.round(life * 1.15)));
+    return {
+      compound,
+      avg_lap_seconds: Number(avg.toFixed(3)),
+      best_lap_seconds: Number(best.toFixed(3)),
+      optimal_stop_lap: optimalStop,
+      tyre_life_laps: life,
+    };
+  });
+
+  const fastestCompound = comparison.reduce((best, current) => (
+    current.avg_lap_seconds < best.avg_lap_seconds ? current : best
+  )).compound;
+
+  return {
+    comparison,
+    fastestCompound,
+  };
+}
+
 function toCompoundKey(label) {
   return String(label || "").trim().toLowerCase();
 }
@@ -375,6 +425,68 @@ function showPostSimulationPanel() {
   postSimPanelEl.classList.add("show");
 }
 
+function renderCompoundComparison(compoundComparison, fastestCompound) {
+  if (!compoundComparisonGridEl) {
+    return;
+  }
+
+  const labels = {
+    soft: "Soft (S)",
+    medium: "Medium (M)",
+    hard: "Hard (H)",
+    inter: "Inter (I)",
+    wet: "Wet (W)",
+  };
+
+  const orderedCompounds = ["hard", "medium", "soft", "inter", "wet"];
+  const byCompound = {};
+  (compoundComparison || []).forEach((item) => {
+    byCompound[String(item.compound || "").toLowerCase()] = item;
+  });
+
+  compoundComparisonGridEl.innerHTML = "";
+
+  orderedCompounds.forEach((compound) => {
+    const data = byCompound[compound];
+    if (!data) {
+      return;
+    }
+
+    const card = document.createElement("article");
+    card.className = `comparison-card ${compound === fastestCompound ? "fastest" : ""}`;
+
+    card.innerHTML = `
+      <div class="comparison-headline">
+        <span class="comparison-dot ${compound}"></span>
+        <span>${labels[compound]}</span>
+        ${compound === fastestCompound ? '<span class="fastest-tag">Fastest Avg</span>' : ""}
+      </div>
+
+      <div class="comparison-metric">
+        <div class="comparison-metric-label">Avg Lap</div>
+        <div class="comparison-metric-value primary">${formatLapTime(data.avg_lap_seconds)}</div>
+      </div>
+
+      <div class="comparison-metric">
+        <div class="comparison-metric-label">Best Lap</div>
+        <div class="comparison-metric-value best">${formatLapTime(data.best_lap_seconds)}</div>
+      </div>
+
+      <div class="comparison-metric">
+        <div class="comparison-metric-label">Optimal Stop</div>
+        <div class="comparison-metric-value">Lap ${data.optimal_stop_lap}</div>
+      </div>
+
+      <div class="comparison-metric">
+        <div class="comparison-metric-label">Tyre Life</div>
+        <div class="comparison-metric-value">${data.tyre_life_laps} laps</div>
+      </div>
+    `;
+
+    compoundComparisonGridEl.append(card);
+  });
+}
+
 function setActiveTyre(value) {
   simulationData.selectedTyre = value;
   tyreButtons.forEach((button) => {
@@ -499,6 +611,7 @@ function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverD
     computePitWindowLap(tyre, race, safetyRisk, track),
     safetyRisk,
   );
+  const compoundComparison = getCompoundComparison(baseLap + totalDelta, raceLaps, safetyRisk, track);
 
   return {
     predicted_lap: Number((baseLap + totalDelta).toFixed(2)),
@@ -511,6 +624,8 @@ function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverD
     pit_strategy_timeline: pitTimeline.timeline,
     pit_stop_count: pitTimeline.pit_stop_count,
     strategy_label: pitTimeline.strategy_label,
+    compound_comparison: compoundComparison.comparison,
+    fastest_compound: compoundComparison.fastestCompound,
   };
 }
 
@@ -571,6 +686,8 @@ async function runSimulation() {
         degradationCurves: data.degradation_curves,
         pitStrategyTimeline: data.pit_strategy_timeline,
         strategyLabel: data.strategy_label,
+        compoundComparison: data.compound_comparison,
+        fastestCompound: data.fastest_compound,
       },
     );
   } catch (error) {
@@ -596,6 +713,8 @@ async function runSimulation() {
         degradationCurves: fallback.degradation_curves,
         pitStrategyTimeline: fallback.pit_strategy_timeline,
         strategyLabel: fallback.strategy_label,
+        compoundComparison: fallback.compound_comparison,
+        fastestCompound: fallback.fastest_compound,
       },
     );
   } finally {
@@ -632,9 +751,13 @@ function updateUI(
   const degradationCurves = analysisData?.degradationCurves || getDegradationCurves(predictedLap, raceLaps);
   const pitStrategyTimeline = analysisData?.pitStrategyTimeline || [];
   const strategyLabel = analysisData?.strategyLabel || "--";
+  const localComparison = getCompoundComparison(predictedLap, raceLaps, safetyCarSelect.value, trackSelect.value);
+  const compoundComparison = analysisData?.compoundComparison || localComparison.comparison;
+  const fastestCompound = analysisData?.fastestCompound || localComparison.fastestCompound;
   applyLegendHighlight(tyre);
   renderDegradationChart(degradationCurves);
   renderPitTimeline(pitStrategyTimeline, raceLaps, strategyLabel);
+  renderCompoundComparison(compoundComparison, fastestCompound);
   showPostSimulationPanel();
 }
 

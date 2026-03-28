@@ -433,6 +433,90 @@ input:focus,
   text-align: right;
 }
 
+.comparison-head {
+  margin-bottom: 0.8rem;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.comparison-card {
+  border: 2px solid rgba(244, 154, 63, 0.55);
+  border-radius: 11px;
+  background: rgba(96, 10, 10, 0.6);
+  padding: 0.78rem;
+  min-height: 228px;
+}
+
+.comparison-card.fastest {
+  border-color: rgba(251, 178, 61, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(251, 178, 61, 0.55);
+}
+
+.comparison-headline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: rgba(245, 227, 227, 0.92);
+}
+
+.comparison-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.comparison-dot.soft { background: #5ca4ff; }
+.comparison-dot.medium { background: #f3b300; }
+.comparison-dot.hard { background: #cfcfcf; }
+.comparison-dot.inter { background: #20c29f; }
+.comparison-dot.wet { background: #7898ff; }
+
+.fastest-tag {
+  margin-left: 0.22rem;
+  border: 1px solid rgba(251, 178, 61, 0.62);
+  border-radius: 6px;
+  padding: 0.14rem 0.4rem;
+  font-size: 0.67rem;
+  color: #f4c43d;
+  background: rgba(139, 81, 10, 0.36);
+}
+
+.comparison-metric {
+  margin-top: 0.72rem;
+}
+
+.comparison-metric-label {
+  font-family: "Space Grotesk", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem;
+  color: rgba(255, 203, 203, 0.8);
+}
+
+.comparison-metric-value {
+  margin-top: 0.18rem;
+  font-size: 1.02rem;
+  color: rgba(250, 235, 235, 0.95);
+  font-weight: 800;
+}
+
+.comparison-metric-value.primary {
+  color: #f3c130;
+}
+
+.comparison-metric-value.best {
+  color: #2cc8a5;
+}
+
 @media (max-width: 980px) {
   .config-grid.two-col,
   .config-grid.three-col,
@@ -463,5 +547,9 @@ input:focus,
   .analysis-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .comparison-grid {
+    grid-template-columns: 1fr;
   }
 }
