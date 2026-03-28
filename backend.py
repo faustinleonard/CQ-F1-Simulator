@@ -1,0 +1,475 @@
+"""
+F1 What-If Race Simulator Backend
+Serves race data and computes predictions based on tire/track conditions.
+"""
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import pandas as pd
+import os
+from datetime import datetime
+import json
+
+app = Flask(__name__)
+CORS(app)
+
+# ============================================================================
+# DATA MODELS & INITIALIZATION
+# ============================================================================
+
+class RaceSimulator:
+    """Core simulation engine for F1 race scenarios."""
+    
+    def __init__(self):
+        self.tire_impact = {
+            "new_soft": -0.8,
+            "new_medium": -0.25,
+            "new_hard": 0.2,
+            "worn_soft": 1.4,
+            "worn_medium": 0.9,
+            "worn_hard": 0.55,
+            "intermediate": 2.0,
+            "wet": 3.8,
+        }
+        
+        self.track_impact = {
+            "optimal": -0.4,
+            "hot": 0.7,
+            "cold": 0.45,
+            "green": 1.0,
+            "damp": 2.4,
+            "wet": 5.2,
+        }
+        
+        self.strategies = self._load_strategies()
+    
+    def _load_strategies(self):
+        """Load predefined pit stop strategies."""
+        return {
+            "aggressive": {
+                "pit_stops": 2,
+                "fuel_load": 0.85,
+                "description": "Early stops, high pace."
+            },
+            "balanced": {
+                "pit_stops": 2,
+                "fuel_load": 0.90,
+                "description": "Standard strategy."
+            },
+            "conservative": {
+                "pit_stops": 1,
+                "fuel_load": 1.0,
+                "description": "One stop, fuel management."
+            },
+            "undercut": {
+                "pit_stops": 2,
+                "fuel_load": 0.75,
+                "description": "Early stop for undercut."
+            }
+        }
+    
+    def predict_lap_time(self, base_lap, tire, track):
+        """Predict adjusted lap time from conditions."""
+        tire_delta = self.tire_impact.get(tire, 0)
+        track_delta = self.track_impact.get(track, 0)
+        adjusted_lap = base_lap + tire_delta + track_delta
+        return {
+            "base_lap": base_lap,
+            "tire_delta": tire_delta,
+            "track_delta": track_delta,
+            "total_delta": tire_delta + track_delta,
+            "predicted_lap": round(adjusted_lap, 2)
+        }
+    
+    def predict_race_finish(self, starting_position, strategy, num_laps, 
+                           base_lap, tire, track, reliability=1.0):
+        """Predict race finish position and time."""
+        lap_time = self.predict_lap_time(base_lap, tire, track)["predicted_lap"]
+        
+        # Tire degradation simulation
+        stint_length = num_laps // self.strategies[strategy]["pit_stops"]
+        tire_wear_factor = 0.15 if tire.startswith("worn") else 0.08
+        
+        race_time = 0
+        position = starting_position
+        
+        for i in range(num_laps):
+            # Increase lap time as tires degrade
+            degradation = (i % stint_length) * tire_wear_factor
+            current_lap = lap_time + degradation
+            race_time += current_lap
+            
+            # Random DNF chance increases with unreliability
+            if reliability < 1.0 and i > (num_laps * 0.3):
+                dnf_chance = (1 - reliability) * 0.001
+                if dnf_chance > 0.5 * (1 - reliability):
+                    return {
+                        "status": "DNF",
+                        "finish_position": None,
+                        "total_time": None,
+                        "laps_completed": i
+                    }
+        
+        return {
+            "status": "Finished",
+            "finish_position": max(1, position - 1) if position > 1 else 1,
+            "total_time": round(race_time, 2),
+            "laps_completed": num_laps
+        }
+
+
+# ============================================================================
+# SAMPLE DATA GENERATORS
+# ============================================================================
+
+def generate_mock_f1_data():
+    """Generate mock F1 2025 season data for demo purposes."""
+    
+    races = [
+        {"round": 1, "country": "Bahrain", "circuit": "Bahrain International Circuit", 
+         "date": "2025-03-02", "laps": 57},
+        {"round": 2, "country": "Saudi Arabia", "circuit": "Jeddah Corniche Circuit", 
+         "date": "2025-03-09", "laps": 50},
+        {"round": 3, "country": "Australia", "circuit": "Albert Park Circuit", 
+         "date": "2025-03-23", "laps": 58},
+        {"round": 4, "country": "Japan", "circuit": "Suzuka International Racing Course", 
+         "date": "2025-04-06", "laps": 53},
+        {"round": 5, "country": "China", "circuit": "Shanghai International Circuit", 
+         "date": "2025-04-13", "laps": 56},
+    ]
+    
+    drivers = [
+        {"id": 1, "name": "Max Verstappen", "number": 1, "team": "Red Bull Racing", "position": 1},
+        {"id": 2, "name": "Lando Norris", "number": 4, "team": "McLaren", "position": 2},
+        {"id": 3, "name": "Lewis Hamilton", "number": 44, "team": "Mercedes", "position": 3},
+        {"id": 4, "name": "Carlos Sainz", "number": 55, "team": "Ferrari", "position": 4},
+        {"id": 5, "name": "Charles Leclerc", "number": 16, "team": "Ferrari", "position": 5},
+        {"id": 6, "name": "Oscar Piastri", "number": 81, "team": "McLaren", "position": 6},
+        {"id": 7, "name": "George Russell", "number": 63, "team": "Mercedes", "position": 7},
+        {"id": 8, "name": "Fernando Alonso", "number": 14, "team": "Aston Martin", "position": 8},
+    ]
+    
+    return {
+        "races": races,
+        "drivers": drivers,
+        "total_rounds": 24,
+        "season": 2025
+    }
+
+
+def generate_race_results_csv():
+    """Generate mock race results CSV data."""
+    races = generate_mock_f1_data()["races"]
+    drivers = generate_mock_f1_data()["drivers"]
+    
+    results = []
+    for race in races[:5]:
+        for idx, driver in enumerate(drivers):
+            results.append({
+                "Round": race["round"],
+                "Country": race["country"],
+                "Location": race["circuit"],
+                "Event Name": f"{race['country']} GP",
+                "DriverId": driver["id"],
+                "DriverNumber": driver["number"],
+                "Driver": driver["name"],
+                "Team": driver["team"],
+                "Position": idx + 1,
+                "Points": max(0, 26 - idx) if idx < 10 else 0,
+                "Time": f"1:30:{30 + idx}.123",
+                "Status": "Finished",
+                "Q1": f"1:32:{10 + idx}.456",
+                "Q2": f"1:31:{20 + idx}.789",
+                "Q3": f"1:30:{30 + idx}.123",
+            })
+    
+    return pd.DataFrame(results)
+
+
+def generate_lap_times_csv():
+    """Generate mock lap times CSV data."""
+    races = generate_mock_f1_data()["races"]
+    drivers = generate_mock_f1_data()["drivers"]
+    
+    laps = []
+    for race in races[:5]:
+        for driver in drivers:
+            for lap_num in range(1, min(31, race["laps"])):
+                # Simulate lap degradation
+                base_time = 90.0 + (driver["position"] - 1) * 0.5
+                degradation = 0.1 * lap_num
+                lap_time = base_time + degradation
+                
+                laps.append({
+                    "Round": race["round"],
+                    "Country": race["country"],
+                    "Location": race["circuit"],
+                    "Event Name": f"{race['country']} GP",
+                    "DriverNumber": driver["number"],
+                    "Driver": driver["name"],
+                    "Team": driver["team"],
+                    "Lap": lap_num,
+                    "LapTime": f"{int(lap_time)}:{int((lap_time % 1) * 60):02d}.{int(((lap_time % 1) * 60 % 1) * 1000):03d}",
+                    "Position": driver["position"],
+                })
+    
+    return pd.DataFrame(laps)
+
+
+# ============================================================================
+# GLOBAL SIMULATOR & DATA CACHE
+# ============================================================================
+
+simulator = RaceSimulator()
+f1_data = generate_mock_f1_data()
+race_results_df = generate_race_results_csv()
+lap_times_df = generate_lap_times_csv()
+
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    """Health check endpoint."""
+    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+
+
+@app.route("/api/season", methods=["GET"])
+def get_season_info():
+    """Get current F1 season info."""
+    return jsonify({
+        "season": f1_data["season"],
+        "total_rounds": f1_data["total_rounds"],
+        "races": len(f1_data["races"]),
+        "drivers": len(f1_data["drivers"])
+    })
+
+
+@app.route("/api/races", methods=["GET"])
+def get_races():
+    """Get all races for the season."""
+    return jsonify(f1_data["races"])
+
+
+@app.route("/api/races/<int:round_num>", methods=["GET"])
+def get_race(round_num):
+    """Get specific race by round number."""
+    race = next((r for r in f1_data["races"] if r["round"] == round_num), None)
+    if not race:
+        return jsonify({"error": "Race not found"}), 404
+    return jsonify(race)
+
+
+@app.route("/api/drivers", methods=["GET"])
+def get_drivers():
+    """Get all drivers."""
+    return jsonify(f1_data["drivers"])
+
+
+@app.route("/api/drivers/<int:driver_id>", methods=["GET"])
+def get_driver(driver_id):
+    """Get specific driver by ID."""
+    driver = next((d for d in f1_data["drivers"] if d["id"] == driver_id), None)
+    if not driver:
+        return jsonify({"error": "Driver not found"}), 404
+    return jsonify(driver)
+
+
+@app.route("/api/race-results", methods=["GET"])
+def get_race_results():
+    """Get race results (supports filtering by round)."""
+    round_num = request.args.get("round", type=int)
+    
+    if round_num:
+        filtered = race_results_df[race_results_df["Round"] == round_num]
+        return jsonify(filtered.to_dict("records"))
+    
+    return jsonify(race_results_df.to_dict("records"))
+
+
+@app.route("/api/lap-times", methods=["GET"])
+def get_lap_times():
+    """Get lap times (supports filtering by round and driver)."""
+    round_num = request.args.get("round", type=int)
+    driver_num = request.args.get("driver", type=int)
+    
+    filtered = lap_times_df.copy()
+    
+    if round_num:
+        filtered = filtered[filtered["Round"] == round_num]
+    if driver_num:
+        filtered = filtered[filtered["DriverNumber"] == driver_num]
+    
+    return jsonify(filtered.to_dict("records"))
+
+
+@app.route("/api/simulate/lap", methods=["POST"])
+def simulate_lap():
+    """
+    Simulate a single lap prediction.
+    
+    Body:
+    {
+        "base_lap": float,
+        "tire_condition": string,
+        "track_condition": string
+    }
+    """
+    data = request.get_json()
+    
+    if not data or "base_lap" not in data or "tire_condition" not in data or "track_condition" not in data:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    result = simulator.predict_lap_time(
+        float(data["base_lap"]),
+        data["tire_condition"],
+        data["track_condition"]
+    )
+    
+    return jsonify(result)
+
+
+@app.route("/api/simulate/race", methods=["POST"])
+def simulate_race():
+    """
+    Simulate full race prediction.
+    
+    Body:
+    {
+        "starting_position": int,
+        "strategy": string (aggressive|balanced|conservative|undercut),
+        "num_laps": int,
+        "base_lap": float,
+        "tire_condition": string,
+        "track_condition": string,
+        "reliability": float (0-1, optional)
+    }
+    """
+    data = request.get_json()
+    
+    required = ["starting_position", "strategy", "num_laps", "base_lap", 
+                "tire_condition", "track_condition"]
+    if not data or not all(k in data for k in required):
+        return jsonify({"error": f"Missing required fields: {required}"}), 400
+    
+    reliability = float(data.get("reliability", 1.0))
+    
+    result = simulator.predict_race_finish(
+        int(data["starting_position"]),
+        data["strategy"],
+        int(data["num_laps"]),
+        float(data["base_lap"]),
+        data["tire_condition"],
+        data["track_condition"],
+        reliability
+    )
+    
+    return jsonify(result)
+
+
+@app.route("/api/strategies", methods=["GET"])
+def get_strategies():
+    """Get available pit stop strategies."""
+    return jsonify(simulator.strategies)
+
+
+@app.route("/api/statistics/avg-lap-time", methods=["GET"])
+def get_avg_lap_time():
+    """Get average lap times by round."""
+    round_num = request.args.get("round", type=int)
+    
+    filtered = lap_times_df.copy()
+    if round_num:
+        filtered = filtered[filtered["Round"] == round_num]
+    
+    # Parse lap times (simplified; in production, use better parsing)
+    avg_by_round = []
+    for round_id in filtered["Round"].unique():
+        round_data = filtered[filtered["Round"] == round_id]
+        race_info = next(r for r in f1_data["races"] if r["round"] == round_id)
+        avg_by_round.append({
+            "round": round_id,
+            "country": race_info["country"],
+            "lap_count": len(round_data),
+            "unique_drivers": round_data["Driver"].nunique()
+        })
+    
+    return jsonify(sorted(avg_by_round, key=lambda x: x["round"]))
+
+
+@app.route("/api/statistics/driver-performance", methods=["GET"])
+def get_driver_performance():
+    """Get driver performance stats."""
+    driver_stats = []
+    
+    for driver in f1_data["drivers"]:
+        driver_races = race_results_df[race_results_df["DriverNumber"] == driver["number"]]
+        total_points = driver_races["Points"].sum()
+        
+        driver_stats.append({
+            "driver_id": driver["id"],
+            "name": driver["name"],
+            "team": driver["team"],
+            "races_completed": len(driver_races[driver_races["Status"] == "Finished"]),
+            "total_points": int(total_points),
+            "best_finish": int(driver_races["Position"].min()) if len(driver_races) > 0 else None,
+            "dnf_count": len(driver_races[driver_races["Status"].str.contains("DNF|Retired|Accident", na=False)])
+        })
+    
+    return jsonify(sorted(driver_stats, key=lambda x: x["total_points"], reverse=True))
+
+
+@app.route("/api/tire-compounds", methods=["GET"])
+def get_tire_compounds():
+    """Get available tire compounds and their properties."""
+    compounds = {
+        "soft": {"name": "Soft", "deg_rate": 0.15, "peak_performance": "immediate"},
+        "medium": {"name": "Medium", "deg_rate": 0.10, "peak_performance": "lap_5"},
+        "hard": {"name": "Hard", "deg_rate": 0.08, "peak_performance": "lap_10"},
+        "intermediate": {"name": "Intermediate", "deg_rate": 0.12, "peak_performance": "damp_only"},
+        "wet": {"name": "Full Wet", "deg_rate": 0.18, "peak_performance": "rain_only"},
+    }
+    return jsonify(compounds)
+
+
+@app.route("/api/track-conditions", methods=["GET"])
+def get_track_conditions():
+    """Get available track conditions."""
+    conditions = {
+        "optimal": {"description": "Optimal grip, dry track", "grip_level": 1.0},
+        "hot": {"description": "Very hot asphalt", "grip_level": 0.85},
+        "cold": {"description": "Cold surface", "grip_level": 0.90},
+        "green": {"description": "Green/low grip track", "grip_level": 0.75},
+        "damp": {"description": "Damp track, no standing water", "grip_level": 0.65},
+        "wet": {"description": "Wet track, standing water", "grip_level": 0.45},
+    }
+    return jsonify(conditions)
+
+
+# ============================================================================
+# ERROR HANDLERS
+# ============================================================================
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Endpoint not found"}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": "Internal server error", "details": str(error)}), 500
+
+
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
+
+if __name__ == "__main__":
+    print("🏎️  F1 What-If Race Simulator Backend")
+    print("=" * 50)
+    print("Starting server on http://localhost:5000")
+    print("API documentation: http://localhost:5000/api/health")
+    print("=" * 50)
+    app.run(debug=True, host="0.0.0.0", port=5000)
