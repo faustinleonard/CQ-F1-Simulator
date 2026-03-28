@@ -8,6 +8,7 @@ const safetyCarSelect = document.getElementById("safetyCarRisk");
 const targetDriverSelect = document.getElementById("targetDriver");
 const targetCircuitSelect = document.getElementById("targetCircuit");
 const runBtn = document.getElementById("simulateBtn");
+const resetBtn = document.getElementById("resetBtn");
 const tyreButtons = Array.from(document.querySelectorAll(".tyre-btn"));
 const predictedTimeEl = document.getElementById("predictedTime");
 const predictedMetaEl = document.getElementById("predictedMeta");
@@ -936,6 +937,65 @@ function updateUI(
   showPostSimulationPanel();
 }
 
+function resetSimulationUI() {
+  clearResultRevealTimers();
+
+  baseLapInput.value = "90";
+
+  if (targetDriverSelect.options.length) {
+    targetDriverSelect.selectedIndex = 0;
+  }
+  if (targetCircuitSelect.options.length) {
+    targetCircuitSelect.selectedIndex = 0;
+  }
+  if (trackSelect.options.length) {
+    trackSelect.selectedIndex = 0;
+  }
+  if (safetyCarSelect.options.length) {
+    safetyCarSelect.selectedIndex = 0;
+  }
+
+  setActiveTyre("soft");
+
+  [predictedTimeEl, deltaEl, pitWindowEl, raceTotalEl].forEach((el) => {
+    el.classList.remove("result-reveal");
+  });
+
+  predictedTimeEl.textContent = "--";
+  predictedMetaEl.textContent = "Tyre setup";
+  deltaEl.textContent = "--";
+  deltaEl.classList.remove("positive", "negative");
+  deltaMetaEl.textContent = "vs dry baseline";
+  pitWindowEl.textContent = "--";
+  pitMetaEl.textContent = "Undercut window";
+  raceTotalEl.textContent = "--";
+  raceMetaEl.textContent = "-- laps";
+
+  degradationChartEl.innerHTML = "";
+  pitTimelineTrackEl.innerHTML = "";
+  strategyBadgeEl.textContent = "--";
+  timelineStartEl.textContent = "Lap 1";
+  timelineMidEl.textContent = "Lap --";
+  timelineEndEl.textContent = "Lap --";
+  compoundComparisonGridEl.innerHTML = "";
+  renderCopilotAnalysis("Run simulation to generate a strategy briefing.");
+  applyLegendHighlight("soft");
+
+  revealRequiresPostSimulationScroll = false;
+  hasScrolledAfterSimulation = false;
+  simulationRevealStartScrollY = window.scrollY || 0;
+
+  document.querySelectorAll(".reveal-on-scroll").forEach((target) => {
+    target.classList.remove("in-view");
+  });
+
+  postSimPanelEl.classList.remove("show");
+  postSimPanelEl.classList.add("hidden");
+
+  runBtn.disabled = false;
+  runBtn.textContent = "Run Simulation";
+}
+
 tyreButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setActiveTyre(button.dataset.tyre);
@@ -943,6 +1003,10 @@ tyreButtons.forEach((button) => {
 });
 
 runBtn.addEventListener("click", runSimulation);
+if (resetBtn) {
+  resetBtn.addEventListener("click", resetSimulationUI);
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   setActiveTyre("soft");
   registerScrollRevealTargets();

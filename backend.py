@@ -526,13 +526,25 @@ def generate_lap_times_csv():
     """Generate mock lap times CSV data."""
     races = generate_mock_f1_data()["races"]
     drivers = generate_mock_f1_data()["drivers"]
+
+    circuit_base_adjust = {
+        "monaco": 1.8,
+        "monza": -1.0,
+        "silverstone": -0.4,
+        "spa-francorchamps": -0.2,
+        "suzuka": -0.15,
+    }
     
     laps = []
     for race in races[:5]:
         for driver in drivers:
             for lap_num in range(1, min(31, race["laps"])):
                 # Simulate lap degradation
-                base_time = 90.0 + (driver["position"] - 1) * 0.5
+                base_time = (
+                    90.0
+                    + (driver["position"] - 1) * 0.5
+                    + circuit_base_adjust.get(race.get("circuit_key", ""), 0.0)
+                )
                 degradation = 0.1 * lap_num
                 lap_time = base_time + degradation
                 
@@ -545,6 +557,7 @@ def generate_lap_times_csv():
                     "Driver": driver["name"],
                     "Team": driver["team"],
                     "Lap": lap_num,
+                    "LapSeconds": round(lap_time, 3),
                     "LapTime": f"{int(lap_time)}:{int((lap_time % 1) * 60):02d}.{int(((lap_time % 1) * 60 % 1) * 1000):03d}",
                     "Position": driver["position"],
                 })
@@ -560,6 +573,78 @@ simulator = RaceSimulator()
 f1_data = generate_mock_f1_data()
 race_results_df = generate_race_results_csv()
 lap_times_df = generate_lap_times_csv()
+
+
+def _parse_lap_time_to_seconds(lap_time):
+    """Best-effort parser for lap-time strings as fallback when LapSeconds is unavailable."""
+    if lap_time is None:
+        return None
+    value = str(lap_time).strip()
+    if not value:
+        return None
+
+    try:
+        if ":" in value:
+            minutes_str, sec_str = value.split(":", 1)
+            return float(minutes_str) * 60.0 + float(sec_str)
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _lap_seconds_series(df):
+    """Return a numeric lap-seconds series from lap dataframe."""
+    if "LapSeconds" in df.columns:
+        series = pd.to_numeric(df["LapSeconds"], errors="coerce")
+        return series.dropna()
+
+    parsed = df["LapTime"].apply(_parse_lap_time_to_seconds)
+    parsed = pd.to_numeric(parsed, errors="coerce")
+    return parsed.dropna()
+
+
+def _compute_round_delta_from_data(round_num):
+    """Compute circuit/round pace delta from recorded lap data for a round."""
+    if round_num is None:
+        return None
+
+    round_df = lap_times_df[lap_times_df["Round"] == int(round_num)]
+    if round_df.empty:
+        return None
+
+    all_series = _lap_seconds_series(lap_times_df)
+    round_series = _lap_seconds_series(round_df)
+    if all_series.empty or round_series.empty:
+        return None
+
+    return float(round(round_series.mean() - all_series.mean(), 3))
+
+
+def _compute_driver_delta_from_data(driver_id, round_num=None):
+    """Compute driver pace delta vs round average from recorded lap data."""
+    if driver_id is None:
+        return None
+
+    driver = next((d for d in f1_data["drivers"] if d["id"] == int(driver_id)), None)
+    if not driver:
+        return None
+
+    target_df = lap_times_df[lap_times_df["DriverNumber"] == int(driver["number"])]
+    baseline_df = lap_times_df
+
+    if round_num is not None:
+        baseline_df = baseline_df[baseline_df["Round"] == int(round_num)]
+        target_df = target_df[target_df["Round"] == int(round_num)]
+
+    if target_df.empty or baseline_df.empty:
+        return None
+
+    driver_series = _lap_seconds_series(target_df)
+    baseline_series = _lap_seconds_series(baseline_df)
+    if driver_series.empty or baseline_series.empty:
+        return None
+
+    return float(round(driver_series.mean() - baseline_series.mean(), 3))
 
 
 # ============================================================================
@@ -671,7 +756,11 @@ def simulate_lap():
     if driver_id is not None:
         selected_driver = next((d for d in f1_data["drivers"] if d["id"] == int(driver_id)), None)
         if selected_driver:
-            driver_delta = simulator.calculate_driver_delta(selected_driver.get("position"))
+            data_driver_delta = _compute_driver_delta_from_data(driver_id, data.get("round"))
+            if data_driver_delta is not None:
+                driver_delta = data_driver_delta
+            else:
+                driver_delta = simulator.calculate_driver_delta(selected_driver.get("position"))
 
     round_num = data.get("round")
     selected_race = None
@@ -688,16 +777,32 @@ def simulate_lap():
     track_condition = str(data["track_condition"]).lower()
     safety_car_risk = data.get("safety_car_risk", "low")
 
+    base_lap = float(data["base_lap"])
+
     result = simulator.predict_lap_time(
-        float(data["base_lap"]),
+        base_lap,
         tire_condition,
         track_condition,
         safety_car_risk,
         circuit,
     )
 
-    result["total_delta"] = round(result["total_delta"] + driver_delta, 3)
-    result["predicted_lap"] = round(result["predicted_lap"] + driver_delta, 2)
+    # If round data exists, prefer data-derived round delta over static circuit map.
+    round_delta_data = _compute_round_delta_from_data(round_num)
+    if round_delta_data is not None:
+        result["circuit_delta"] = round_delta_data
+
+    tire_delta = float(result["tire_delta"])
+    track_delta = float(result["track_delta"])
+    safety_delta = float(result["safety_car_delta"])
+    circuit_delta = float(result["circuit_delta"])
+
+    total_delta_exact = tire_delta + track_delta + safety_delta + circuit_delta + float(driver_delta)
+    predicted_lap_exact = base_lap + total_delta_exact
+
+    result["base_lap"] = base_lap
+    result["total_delta"] = round(total_delta_exact, 3)
+    result["predicted_lap"] = round(predicted_lap_exact, 3)
 
     race_laps = 50
     if selected_race and "laps" in selected_race:
@@ -710,8 +815,8 @@ def simulate_lap():
         track_condition,
     )
 
-    race_total_seconds = round(result["predicted_lap"] * race_laps, 2)
-    degradation_curves = simulator.build_degradation_curves(result["predicted_lap"], race_laps)
+    race_total_seconds = round(predicted_lap_exact * race_laps, 3)
+    degradation_curves = simulator.build_degradation_curves(predicted_lap_exact, race_laps)
     pit_strategy = simulator.build_pit_timeline(
         tyre_compound,
         race_laps,
@@ -719,7 +824,7 @@ def simulate_lap():
         safety_car_risk,
     )
     compound_comparison = simulator.build_compound_comparison(
-        result["predicted_lap"],
+        predicted_lap_exact,
         race_laps,
         safety_car_risk,
         track_condition,
