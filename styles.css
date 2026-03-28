@@ -598,12 +598,13 @@ input:focus,
   font-family: "Space Grotesk", sans-serif;
   font-weight: 700;
   letter-spacing: 0.04em;
-  border-right: 1px solid rgba(196, 218, 249, 0.26);
+  border: 2px solid rgba(243, 179, 0, 0.72);
+  margin-left: -2px;
   color: rgba(229, 237, 248, 0.92);
 }
 
-.timeline-segment:last-child {
-  border-right: none;
+.timeline-segment:first-child {
+  margin-left: 0;
 }
 
 .timeline-segment.soft {
