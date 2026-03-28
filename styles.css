@@ -443,6 +443,33 @@ input:focus,
   gap: 0.65rem;
 }
 
+.ai-head {
+  margin-bottom: 0.7rem;
+}
+
+.ai-analysis-card {
+  border: 2px solid rgba(244, 154, 63, 0.48);
+  border-radius: 11px;
+  background: rgba(95, 6, 6, 0.66);
+  padding: 0.95rem;
+}
+
+.ai-analysis-card h3 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.92rem;
+  color: #f4c43d;
+}
+
+.ai-analysis-card p {
+  margin: 0.78rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: rgba(246, 235, 235, 0.95);
+}
+
 .comparison-card {
   border: 2px solid rgba(244, 154, 63, 0.55);
   border-radius: 11px;

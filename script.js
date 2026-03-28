@@ -26,6 +26,7 @@ const timelineMidEl = document.getElementById("timelineMid");
 const timelineEndEl = document.getElementById("timelineEnd");
 const compoundLegendEl = document.getElementById("compoundLegend");
 const compoundComparisonGridEl = document.getElementById("compoundComparisonGrid");
+const copilotAnalysisTextEl = document.getElementById("copilotAnalysisText");
 
 // State
 const simulationData = {
@@ -285,6 +286,33 @@ function getCompoundComparison(predictedLap, raceLaps, safetyRisk, track) {
   };
 }
 
+function getCopilotAnalysis(tyre, track, safetyRisk, totalDelta, pitWindowLap, fastestCompound) {
+  const pacePhrase =
+    totalDelta <= -0.2
+      ? "expect an advantage versus baseline"
+      : totalDelta >= 1.2
+        ? "expect a pace deficit versus baseline"
+        : "expect near-baseline race pace";
+
+  const trackLabel = {
+    optimal: "optimal conditions",
+    hot: "very hot asphalt",
+    cold: "cold surface",
+    green: "green track",
+    damp: "damp conditions",
+    wet: "wet conditions",
+  }[track] || "current conditions";
+
+  const riskLabel = {
+    low: "low safety-car risk",
+    medium: "medium safety-car risk",
+    high: "high safety-car risk",
+  }[safetyRisk] || "low safety-car risk";
+
+  const fastestLabel = getTyreLabel(fastestCompound || "medium");
+  return `On ${getTyreLabel(tyre).toLowerCase()} compound with ${trackLabel}, ${pacePhrase}. With ${riskLabel}, target pit around lap ${pitWindowLap} for undercut coverage. If degradation rises, ${fastestLabel} currently projects as the fastest average alternative.`;
+}
+
 function toCompoundKey(label) {
   return String(label || "").trim().toLowerCase();
 }
@@ -487,6 +515,13 @@ function renderCompoundComparison(compoundComparison, fastestCompound) {
   });
 }
 
+function renderCopilotAnalysis(text) {
+  if (!copilotAnalysisTextEl) {
+    return;
+  }
+  copilotAnalysisTextEl.textContent = text || "Run simulation to generate a strategy briefing.";
+}
+
 function setActiveTyre(value) {
   simulationData.selectedTyre = value;
   tyreButtons.forEach((button) => {
@@ -612,6 +647,14 @@ function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverD
     safetyRisk,
   );
   const compoundComparison = getCompoundComparison(baseLap + totalDelta, raceLaps, safetyRisk, track);
+  const copilotAnalysis = getCopilotAnalysis(
+    tyre,
+    track,
+    safetyRisk,
+    totalDelta,
+    computePitWindowLap(tyre, race, safetyRisk, track),
+    compoundComparison.fastestCompound,
+  );
 
   return {
     predicted_lap: Number((baseLap + totalDelta).toFixed(2)),
@@ -626,6 +669,7 @@ function localFallbackSimulation(baseLap, tyre, track, safetyRisk, race, driverD
     strategy_label: pitTimeline.strategy_label,
     compound_comparison: compoundComparison.comparison,
     fastest_compound: compoundComparison.fastestCompound,
+    copilot_analysis: copilotAnalysis,
   };
 }
 
@@ -688,6 +732,7 @@ async function runSimulation() {
         strategyLabel: data.strategy_label,
         compoundComparison: data.compound_comparison,
         fastestCompound: data.fastest_compound,
+        copilotAnalysis: data.copilot_analysis,
       },
     );
   } catch (error) {
@@ -715,6 +760,7 @@ async function runSimulation() {
         strategyLabel: fallback.strategy_label,
         compoundComparison: fallback.compound_comparison,
         fastestCompound: fallback.fastest_compound,
+        copilotAnalysis: fallback.copilot_analysis,
       },
     );
   } finally {
@@ -754,10 +800,20 @@ function updateUI(
   const localComparison = getCompoundComparison(predictedLap, raceLaps, safetyCarSelect.value, trackSelect.value);
   const compoundComparison = analysisData?.compoundComparison || localComparison.comparison;
   const fastestCompound = analysisData?.fastestCompound || localComparison.fastestCompound;
+  const copilotAnalysis = analysisData?.copilotAnalysis
+    || getCopilotAnalysis(
+      tyre,
+      trackSelect.value,
+      safetyCarSelect.value,
+      totalDelta,
+      pitWindowLap,
+      fastestCompound,
+    );
   applyLegendHighlight(tyre);
   renderDegradationChart(degradationCurves);
   renderPitTimeline(pitStrategyTimeline, raceLaps, strategyLabel);
   renderCompoundComparison(compoundComparison, fastestCompound);
+  renderCopilotAnalysis(copilotAnalysis);
   showPostSimulationPanel();
 }
 

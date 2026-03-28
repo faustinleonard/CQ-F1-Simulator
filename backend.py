@@ -312,6 +312,53 @@ class RaceSimulator:
             "comparison": comparison,
             "fastest_compound": fastest,
         }
+
+    def build_copilot_analysis(
+        self,
+        tyre_compound,
+        track_condition,
+        safety_car_risk,
+        total_delta,
+        pit_window_lap,
+        fastest_compound,
+    ):
+        """Generate a short Copilot strategy narrative for the selected scenario."""
+        tyre_label = {
+            "soft": "soft",
+            "medium": "medium",
+            "hard": "hard",
+            "inter": "inter",
+            "wet": "wet",
+        }.get(str(tyre_compound or "medium").lower(), "medium")
+
+        track_label = {
+            "optimal": "optimal conditions",
+            "hot": "very hot asphalt",
+            "cold": "cold surface",
+            "green": "green track",
+            "damp": "damp conditions",
+            "wet": "wet conditions",
+        }.get(str(track_condition or "optimal").lower(), "current conditions")
+
+        risk_label = {
+            "low": "low safety-car risk",
+            "medium": "medium safety-car risk",
+            "high": "high safety-car risk",
+        }.get(self.normalize_safety_risk(safety_car_risk), "low safety-car risk")
+
+        if total_delta <= -0.2:
+            pace_phrase = "expect an advantage versus baseline"
+        elif total_delta >= 1.2:
+            pace_phrase = "expect a pace deficit versus baseline"
+        else:
+            pace_phrase = "expect near-baseline race pace"
+
+        fastest_label = str(fastest_compound or "medium").capitalize()
+        return (
+            f"On {tyre_label} compound with {track_label}, {pace_phrase}. "
+            f"With {risk_label}, target pit around lap {pit_window_lap} for undercut coverage. "
+            f"If degradation rises, {fastest_label} currently projects as the fastest average alternative."
+        )
     
     def predict_race_finish(self, starting_position, strategy, num_laps, 
                            base_lap, tire, track, reliability=1.0):
@@ -658,6 +705,14 @@ def simulate_lap():
     result["strategy_label"] = pit_strategy["strategy_label"]
     result["compound_comparison"] = compound_comparison["comparison"]
     result["fastest_compound"] = compound_comparison["fastest_compound"]
+    result["copilot_analysis"] = simulator.build_copilot_analysis(
+        tyre_compound,
+        track_condition,
+        safety_car_risk,
+        result["total_delta"],
+        pit_window_lap,
+        compound_comparison["fastest_compound"],
+    )
     
     return jsonify(result)
 
