@@ -28,6 +28,11 @@ const compoundLegendEl = document.getElementById("compoundLegend");
 const compoundComparisonGridEl = document.getElementById("compoundComparisonGrid");
 const copilotAnalysisTextEl = document.getElementById("copilotAnalysisText");
 
+let scrollRevealObserver = null;
+let revealRequiresPostSimulationScroll = false;
+let hasScrolledAfterSimulation = false;
+let simulationRevealStartScrollY = 0;
+
 // State
 const simulationData = {
   drivers: [],
@@ -467,6 +472,60 @@ function showPostSimulationPanel() {
   }
   postSimPanelEl.classList.remove("hidden");
   postSimPanelEl.classList.add("show");
+  revealRequiresPostSimulationScroll = true;
+  hasScrolledAfterSimulation = false;
+  simulationRevealStartScrollY = window.scrollY || 0;
+
+  document.querySelectorAll(".reveal-on-scroll").forEach((target) => {
+    target.classList.remove("in-view");
+  });
+
+  registerScrollRevealTargets();
+  requestAnimationFrame(() => {
+    registerScrollRevealTargets();
+  });
+}
+
+function setupScrollRevealObserver() {
+  if (scrollRevealObserver || !("IntersectionObserver" in window)) {
+    return;
+  }
+
+  scrollRevealObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) {
+        return;
+      }
+
+      if (revealRequiresPostSimulationScroll && !hasScrolledAfterSimulation) {
+        return;
+      }
+
+      entry.target.classList.add("in-view");
+      observer.unobserve(entry.target);
+    });
+  }, {
+    threshold: 0.5,
+    rootMargin: "0px 0px -4% 0px",
+  });
+}
+
+function registerScrollRevealTargets() {
+  setupScrollRevealObserver();
+  const targets = document.querySelectorAll(".reveal-on-scroll");
+
+  targets.forEach((target) => {
+    if (target.classList.contains("in-view")) {
+      return;
+    }
+
+    if (!scrollRevealObserver) {
+      target.classList.add("in-view");
+      return;
+    }
+
+    scrollRevealObserver.observe(target);
+  });
 }
 
 function renderCompoundComparison(compoundComparison, fastestCompound) {
@@ -498,6 +557,7 @@ function renderCompoundComparison(compoundComparison, fastestCompound) {
 
     const card = document.createElement("article");
     card.className = `comparison-card ${compound === fastestCompound ? "fastest" : ""}`;
+    card.classList.add("intro-reveal");
 
     card.innerHTML = `
       <div class="comparison-headline">
@@ -526,6 +586,14 @@ function renderCompoundComparison(compoundComparison, fastestCompound) {
         <div class="comparison-metric-value">${data.tyre_life_laps} laps</div>
       </div>
     `;
+
+    const delayMs = orderedCompounds.indexOf(compound) * 180;
+    card.style.animationDelay = `${delayMs}ms`;
+
+    if (compound === fastestCompound) {
+      card.classList.add("sun-ray-flash");
+      card.style.setProperty("--sun-delay", `${delayMs + 420}ms`);
+    }
 
     compoundComparisonGridEl.append(card);
   });
@@ -843,5 +911,21 @@ tyreButtons.forEach((button) => {
 runBtn.addEventListener("click", runSimulation);
 window.addEventListener("DOMContentLoaded", () => {
   setActiveTyre("soft");
+  registerScrollRevealTargets();
+
+  window.addEventListener("scroll", () => {
+    if (!revealRequiresPostSimulationScroll || hasScrolledAfterSimulation) {
+      return;
+    }
+
+    const scrollDelta = Math.abs((window.scrollY || 0) - simulationRevealStartScrollY);
+    if (scrollDelta < 24) {
+      return;
+    }
+
+    hasScrolledAfterSimulation = true;
+    registerScrollRevealTargets();
+  }, { passive: true });
+
   initializeApp();
 });

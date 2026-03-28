@@ -40,6 +40,7 @@ body {
 }
 
 .race-card {
+  position: relative;
   border: 2px solid rgba(116, 168, 255, 0.38);
   background:
     linear-gradient(180deg, rgba(12, 16, 20, 0.98), rgba(5, 8, 10, 0.98));
@@ -49,6 +50,33 @@ body {
     inset 0 1px 0 rgba(116, 168, 255, 0.2);
   overflow: hidden;
   animation: panel-rise 500ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.race-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      102deg,
+      transparent 0 10px,
+      rgba(255, 255, 255, 0.05) 10px 12px,
+      transparent 12px 26px
+    );
+  mix-blend-mode: screen;
+  opacity: 0.68;
+  animation: speed-sweep 16s linear infinite;
+}
+
+@keyframes speed-sweep {
+  from {
+    transform: translateX(-42%);
+  }
+
+  to {
+    transform: translateX(42%);
+  }
 }
 
 @keyframes panel-rise {
@@ -90,6 +118,7 @@ body {
   text-transform: capitalize;
   font-weight: 700;
   cursor: default;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
 .setup-btn:hover {
@@ -188,6 +217,23 @@ input:focus,
   background: rgba(41, 66, 95, 0.5);
   border-color: rgba(143, 184, 255, 0.95);
   color: #dce7ff;
+  animation: tyre-active-glow 4.8s ease-in-out infinite;
+}
+
+@keyframes tyre-active-glow {
+  0% {
+    box-shadow: 0 0 0 rgba(116, 168, 255, 0);
+  }
+
+  50% {
+    box-shadow:
+      0 0 24px rgba(116, 168, 255, 0.35),
+      inset 0 0 14px rgba(116, 168, 255, 0.22);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgba(116, 168, 255, 0);
+  }
 }
 
 .dot {
@@ -195,6 +241,24 @@ input:focus,
   height: 15px;
   border-radius: 50%;
   display: inline-block;
+  animation: tyre-dot-pulse 3.6s ease-in-out infinite;
+}
+
+@keyframes tyre-dot-pulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  50% {
+    transform: scale(1.2);
+    filter: brightness(1.35);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 
 .dot-soft { background: rgb(236, 56, 56); }
@@ -218,6 +282,38 @@ input:focus,
   background: linear-gradient(180deg, #121212, #070707);
   cursor: pointer;
   transition: filter 160ms ease, transform 160ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.simulate-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 42%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.24), transparent);
+  transform: skewX(-20deg);
+  animation: button-shimmer 5.2s ease-in-out infinite;
+}
+
+@keyframes button-shimmer {
+  0% {
+    left: -130%;
+  }
+
+  46% {
+    left: -130%;
+  }
+
+  72% {
+    left: 130%;
+  }
+
+  100% {
+    left: 130%;
+  }
 }
 
 .simulate-btn:hover {
@@ -225,6 +321,10 @@ input:focus,
   border-color: rgba(255, 92, 92, 0.95);
   filter: brightness(1.04);
   transform: translateY(-1px);
+}
+
+.simulate-btn:hover::after {
+  left: 128%;
 }
 
 .dropdown:hover {
@@ -361,6 +461,30 @@ input:focus,
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(9, 14, 18, 0.94), rgba(8, 11, 14, 0.94));
   padding: 0.5rem;
+}
+
+.reveal-on-scroll {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(54px) scale(0.975);
+  filter: blur(4px);
+  transition:
+    opacity 1180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 1180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 1180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    visibility 0ms linear 1180ms;
+}
+
+.reveal-on-scroll.in-view {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+  transition:
+    opacity 1180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 1180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter 1180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    visibility 0ms linear 0ms;
 }
 
 .degradation-chart {
@@ -547,11 +671,70 @@ input:focus,
   background: rgba(12, 12, 12, 0.94);
   padding: 0.78rem;
   min-height: 228px;
+  position: relative;
+  overflow: hidden;
 }
 
 .comparison-card.fastest {
   border-color: rgba(243, 179, 0, 0.9);
   box-shadow: inset 0 0 0 1px rgba(243, 179, 0, 0.52);
+}
+
+.comparison-card.intro-reveal {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  animation: comparison-reveal 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes comparison-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.comparison-card.fastest.sun-ray-flash::after {
+  content: "";
+  position: absolute;
+  inset: -35% -70%;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    rgba(255, 244, 189, 0.05) 42%,
+    rgba(255, 235, 148, 0.35) 50%,
+    rgba(255, 224, 126, 0.16) 58%,
+    transparent 72%
+  );
+  transform: translateX(-65%) rotate(-7deg);
+  opacity: 0;
+  animation: sun-ray-sweep 2.8s ease-in-out var(--sun-delay, 0.9s) 1;
+}
+
+@keyframes sun-ray-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-65%) rotate(-7deg);
+  }
+
+  24% {
+    opacity: 1;
+  }
+
+  58% {
+    opacity: 0.92;
+    transform: translateX(10%) rotate(-7deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(75%) rotate(-7deg);
+  }
 }
 
 .comparison-headline {
@@ -613,6 +796,34 @@ input:focus,
 
 .comparison-metric-value.best {
   color: #2cc8a5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .race-card::before,
+  .tyre-btn.active,
+  .dot,
+  .simulate-btn::after {
+    animation: none;
+  }
+
+  .comparison-card.intro-reveal,
+  .comparison-card.fastest.sun-ray-flash::after {
+    animation: none;
+  }
+
+  .comparison-card.intro-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .reveal-on-scroll,
+  .reveal-on-scroll.in-view {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
 }
 
 @media (max-width: 980px) {
