@@ -184,7 +184,7 @@ input:focus,
   display: inline-block;
 }
 
-.dot-soft { background: #59a6ff; }
+.dot-soft { background: rgb(236, 56, 56); }
 .dot-medium { background: #f3b300; }
 .dot-hard { background: #d7d7d7; }
 .dot-inter { background: #00b58e; }
