@@ -1,2 +1,2 @@
-# CQ-F1-Simulator
-CQ Code Quantum Simulator
+# F1 What-If Race Simulator
+F1 What-If Race Simulator
